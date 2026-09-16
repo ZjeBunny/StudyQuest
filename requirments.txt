@@ -1,0 +1,11 @@
+langchain
+wikipedia
+pydantic
+pydantic_ai
+python-dotenv
+black
+PySide6
+requests
+pypdf
+python-docx
+Pillow
