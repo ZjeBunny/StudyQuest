@@ -1,7 +1,7 @@
 from pydantic_ai import Agent
 from pydantic_ai.models.ollama import OllamaModel
 from pydantic_ai.providers.ollama import OllamaProvider
-import os
+import tools
 
 qwen = OllamaModel(
     "qwen3.5:4b",
