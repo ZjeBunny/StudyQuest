@@ -1,0 +1,17 @@
+import sys
+from PySide6.QtWidgets import QApplication
+
+from src.window import MainWindow
+
+def main():
+    app = QApplication(sys.argv)
+    app.setApplicationName("StudyQuest")
+
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec())
+
+
+if __name__ == "__main__":
+    main()
+
