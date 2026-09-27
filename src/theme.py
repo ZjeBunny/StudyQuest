@@ -1,6 +1,7 @@
 DARK_THEME = '''
 * { font-family: "Segoe UI"; color: #e7e7e7; }
 QMainWindow, QWidget { background: #111315; }
+QLabel {background: transparent}
 QFrame#TitleBar { background: #17191c; border-bottom: 1px solid #292d32; }
 QFrame#Sidebar { background: #151719; border-right: 1px solid #292d32; }
 QPushButton { background: #20242a; border: 1px solid #2c3239; border-radius: 8px; padding: 9px 12px; }
@@ -24,6 +25,7 @@ QListWidget::item:selected { background: #2b3037; }
 LIGHT_THEME = '''
 * { font-family: "Segoe UI"; color: #202124; }
 QMainWindow, QWidget { background: #f5f6f8; }
+QLabel {background: transparent}
 QFrame#TitleBar { background: #ffffff; border-bottom: 1px solid #dfe3e8; }
 QFrame#Sidebar { background: #f0f2f5; border-right: 1px solid #dfe3e8; }
 QPushButton { background: #ffffff; border: 1px solid #d5d9de; border-radius: 8px; padding: 9px 12px; }
