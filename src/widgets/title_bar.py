@@ -13,16 +13,16 @@ class TitleBar(QFrame):
         self.setFixedHeight(40)
 
         layout = QHBoxLayout()
-        layout.setContentsMargins(16, 8, 16, 8)
+        layout.setContentsMargins(16, 4, 16, 4)
 
         image = QLabel()
         image.setPixmap(QPixmap("assets/light_mode_main.jpg" if self.theme == LIGHT_THEME else "assets/dark_mode_main.png"))
-        image.setFixedSize(24, 24)
+        image.setFixedSize(32, 32)
         image.setScaledContents(True)
         layout.addWidget(image)
 
         title = QLabel("StudyQuest")
-        title.setStyleSheet("font-size:16px;font-weight:700;")
+        title.setStyleSheet("font-size:20px;font-weight:700;")
         layout.addWidget(title)
 
         layout.addStretch()
