@@ -6,13 +6,14 @@ from src.widgets.sidebar import Sidebar
 
 class MainWindow(QMainWindow):
 
-    def __init__(self):
+    def __init__(self, theme):
         super().__init__()
+        self.theme = theme
         self.setWindowTitle("Study Quest")
         self.setWindowFlag(Qt.FramelessWindowHint); self.resize(1280 , 720)
         main = QWidget()
         ml = QVBoxLayout(main); ml.setContentsMargins(0,0,0,0); ml.setSpacing(0)
-        ml.addWidget(TitleBar(self))
+        ml.addWidget(TitleBar(self, theme))
         body=QHBoxLayout(); 
         body.setContentsMargins(0,0,0,0); body.setSpacing(0);        
         self.sidebar=Sidebar(); body.addWidget(self.sidebar); 
