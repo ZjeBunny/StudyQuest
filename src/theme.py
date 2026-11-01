@@ -112,6 +112,67 @@ QPushButton#CloseButton:hover {
     border-color: #8a001a;
     color: white;
 }
+
+QFrame#WelcomeCard {
+    background: #202630;
+    border: 1px solid #303947;
+    border-radius: 16px;
+}
+
+QLabel#WelcomeTitle {
+    color: #f0f1f5;
+    font-size: 23px;
+    font-weight: bold;
+}
+
+QLabel#WelcomeDescription {
+    color: #aab3c2;
+    font-size: 14px;
+}
+
+QLabel#SectionTitle {
+    font-size: 19px;
+    font-weight: bold;
+}
+
+QFrame#FeatureCard {
+    background: #181b1f;
+    border: 1px solid #30353c;
+    border-radius: 12px;
+}
+
+QFrame#FeatureCard:hover {
+    border: 1px solid #667b9e;
+}
+
+QLabel#FeatureIcon {
+    font-size: 28px;
+}
+
+QPushButton#PrimaryButton {
+    background: #52698c;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 11px 18px;
+    font-weight: bold;
+}
+
+QPushButton#PrimaryButton:hover {
+    background: #627fa9;
+}
+
+QPushButton#CardButton {
+    background: transparent;
+    color: #91acd6;
+    border: none;
+    padding: 5px 0;
+}
+
+QLabel#PageFooter {
+    color: #737d8b;
+    font-size: 12px;
+}
 '''
 
 LIGHT_THEME = '''
@@ -180,5 +241,66 @@ QPushButton#CloseButton:hover {
     background-color: #bf001a;
     border-color: #8a001a;
     color: white;
+}
+
+QFrame#WelcomeCard {
+    background: #e9edf5;
+    border: 1px solid #d8deea;
+    border-radius: 16px;
+}
+
+QLabel#WelcomeTitle {
+    color: #252832;
+    font-size: 23px;
+    font-weight: bold;
+}
+
+QLabel#WelcomeDescription {
+    color: #68717c;
+    font-size: 14px;
+}
+
+QLabel#SectionTitle {
+    font-size: 19px;
+    font-weight: bold;
+}
+
+QFrame#FeatureCard {
+    background: #ffffff;
+    border: 1px solid #dfe3e8;
+    border-radius: 12px;
+}
+
+QFrame#FeatureCard:hover {
+    border: 1px solid #8298ba;
+}
+
+QLabel#FeatureIcon {
+    font-size: 28px;
+}
+
+QPushButton#PrimaryButton {
+    background: #52698c;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 11px 18px;
+    font-weight: bold;
+}
+
+QPushButton#PrimaryButton:hover {
+    background: #405a80;
+}
+
+QPushButton#CardButton {
+    background: transparent;
+    color: #52698c;
+    border: none;
+    padding: 5px 0;
+}
+
+QLabel#PageFooter {
+    color: #89919c;
+    font-size: 12px;
 }
 '''

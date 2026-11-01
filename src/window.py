@@ -4,6 +4,7 @@ from PySide6.QtCore import Qt
 
 from src.widgets.title_bar import TitleBar
 from src.widgets.sidebar import Sidebar
+from src.pages.start_page import StartPage
 
 class MainWindow(QMainWindow):
 
@@ -19,6 +20,11 @@ class MainWindow(QMainWindow):
         body.setContentsMargins(0,0,0,0); body.setSpacing(0);        
         self.sidebar=Sidebar(); body.addWidget(self.sidebar, 1); 
         self.stack=QStackedWidget()
+        # Undere here goes all pages creating
+        self.start_page = StartPage()
+        self.start_page.page_requested.connect(self.change_page)
+        self.stack.addWidget(self.start_page)
+        
         self.stack.setSizePolicy(
             QSizePolicy.Policy.Expanding,
             QSizePolicy.Policy.Expanding
@@ -26,3 +32,9 @@ class MainWindow(QMainWindow):
         body.addWidget(self.stack, 4); 
         ml.addLayout(body)
         self.setCentralWidget(main) 
+
+    def change_page(self, page):
+        self.sidebar.select(page)
+
+        if page == "start":
+            self.stack.setCurrentWidget(self.start_page)
