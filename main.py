@@ -16,10 +16,16 @@ def is_dark_mode():
 def main():
     app = QApplication(sys.argv)
     app.setApplicationName("StudyQuest")
-    theme = DARK_THEME if is_dark_mode() else LIGHT_THEME
+
+    if(is_dark_mode()):
+        theme = DARK_THEME
+        theme_name = "Dark"
+    else:
+        theme = LIGHT_THEME
+        theme_name = "Light"
     app.setStyleSheet(theme)
 
-    window = MainWindow(theme)
+    window = MainWindow(theme_name)
     window.show()
     sys.exit(app.exec())
 
