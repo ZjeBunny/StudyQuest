@@ -2,9 +2,9 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QLabel, QWidget,
                                 QVBoxLayout, QHBoxLayout, QStackedWidget, QSizePolicy)
 from PySide6.QtCore import Qt
 
-from src.widgets.title_bar import TitleBar
-from src.widgets.sidebar import Sidebar
-from src.pages.start_page import StartPage
+from widgets.title_bar import TitleBar
+from widgets.sidebar import Sidebar
+from pages.start_page import StartPage
 
 class MainWindow(QMainWindow):
 
@@ -18,7 +18,9 @@ class MainWindow(QMainWindow):
         ml.addWidget(TitleBar(self, theme_name))
         body=QHBoxLayout(); 
         body.setContentsMargins(0,0,0,0); body.setSpacing(0);        
-        self.sidebar=Sidebar(); body.addWidget(self.sidebar, 1); 
+        self.sidebar=Sidebar()
+        self.sidebar.page_changed.connect(self.change_page)
+        body.addWidget(self.sidebar, 1); 
         self.stack=QStackedWidget()
         # Undere here goes all pages creating
         self.start_page = StartPage()

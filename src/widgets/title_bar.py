@@ -30,7 +30,7 @@ class TitleBar(QFrame):
 
         self.logo = QLabel()
         self.logo.setObjectName("TitleLogo")
-        logo_path = Path(__file__).resolve().parents[2] / "assets"
+        logo_path = Path(__file__).resolve().parents[2] / "assets" / "images"
 
         if theme_name == "Dark":
             pixmap = QPixmap(str(logo_path / "dark_logo.png"))

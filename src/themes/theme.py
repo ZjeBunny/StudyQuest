@@ -173,6 +173,62 @@ QLabel#PageFooter {
     color: #737d8b;
     font-size: 12px;
 }
+
+QFrame#Sidebar {
+    background-color: #15191F;
+    border-right: 1px solid #292F39;
+}
+
+QLabel#SidebarSection {
+    color: #737F91;
+    font-size: 10px;
+    font-weight: bold;
+    padding-left: 14px;
+}
+
+QPushButton#NavButton {
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    min-height: 44px;
+    max-height: 44px;
+    text-align: left;
+}
+
+QPushButton#NavButton:hover {
+    background-color: #222832;
+}
+
+QPushButton#NavButton[selected="true"] {
+    background-color: #293547;
+    border-left: 3px solid #829CC5;
+}
+
+QLabel#NavIcon {
+    color: #8794A8;
+    background: transparent;
+    min-width: 22px;
+}
+
+QPushButton#NavButton[selected="true"] QLabel#NavIcon {
+    color: #A9C2EA;
+}
+
+QLabel#NavText {
+    color: #B9C1CE;
+    font-size: 13px;
+    background: transparent;
+}
+
+QPushButton#NavButton[selected="true"] QLabel#NavText {
+    color: #F0F3F8;
+    font-weight: bold;
+}
+
+QFrame#SidebarSeparator {
+    background-color: #292F39;
+    border: none;
+}
 '''
 
 LIGHT_THEME = '''
@@ -302,5 +358,60 @@ QPushButton#CardButton {
 QLabel#PageFooter {
     color: #89919c;
     font-size: 12px;
+}
+
+QFrame#Sidebar {
+    background-color: #F0F2F5;
+    border-right: 1px solid #DFE3E8;
+}
+
+QLabel#SidebarSection {
+    color: #929AA7;
+    font-size: 10px;
+    font-weight: bold;
+    padding-left: 14px;
+}
+
+QPushButton#NavButton {
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    min-height: 44px;
+    max-height: 44px;
+}
+
+QPushButton#NavButton:hover {
+    background-color: #E5E9EF;
+}
+
+QPushButton#NavButton[selected="true"] {
+    background-color: #DFE6F0;
+    border-left: 3px solid #52698C;
+}
+
+QLabel#NavIcon {
+    color: #778397;
+    background: transparent;
+    min-width: 22px;
+}
+
+QPushButton#NavButton[selected="true"] QLabel#NavIcon {
+    color: #52698C;
+}
+
+QLabel#NavText {
+    color: #596273;
+    font-size: 13px;
+    background: transparent;
+}
+
+QPushButton#NavButton[selected="true"] QLabel#NavText {
+    color: #252832;
+    font-weight: bold;
+}
+
+QFrame#SidebarSeparator {
+    background-color: #DFE3E8;
+    border: none;
 }
 '''

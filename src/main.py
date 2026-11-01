@@ -2,8 +2,8 @@ import sys
 import winreg
 from PySide6.QtWidgets import QApplication
 
-from src.window import MainWindow
-from src.theme import DARK_THEME, LIGHT_THEME
+from app.window import MainWindow
+from themes.theme import DARK_THEME, LIGHT_THEME
 
 def is_dark_mode():
     key = winreg.OpenKey(
