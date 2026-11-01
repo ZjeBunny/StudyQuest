@@ -1,4 +1,5 @@
-from PySide6.QtWidgets import QApplication, QMainWindow, QLabel, QWidget, QVBoxLayout, QHBoxLayout, QStackedWidget
+from PySide6.QtWidgets import (QApplication, QMainWindow, QLabel, QWidget,
+                                QVBoxLayout, QHBoxLayout, QStackedWidget, QSizePolicy)
 from PySide6.QtCore import Qt
 
 from src.widgets.title_bar import TitleBar
@@ -16,8 +17,12 @@ class MainWindow(QMainWindow):
         ml.addWidget(TitleBar(self, theme))
         body=QHBoxLayout(); 
         body.setContentsMargins(0,0,0,0); body.setSpacing(0);        
-        self.sidebar=Sidebar(); body.addWidget(self.sidebar); 
+        self.sidebar=Sidebar(); body.addWidget(self.sidebar, 1); 
         self.stack=QStackedWidget()
-        body.addWidget(self.stack); 
+        self.stack.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Expanding
+        )
+        body.addWidget(self.stack, 4); 
         ml.addLayout(body)
-        self.setCentralWidget(main)
+        self.setCentralWidget(main) 
