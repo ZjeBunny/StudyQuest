@@ -56,7 +56,7 @@ Before running StudyQuest, make sure you have:
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/YOUR_USERNAME/StudyQuest.git
+   git clone https://github.com/ZjeBunny/StudyQuest.git
    cd StudyQuest
    ```
 
