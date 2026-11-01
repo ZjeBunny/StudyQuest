@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import (QApplication, QMainWindow, QLabel, QWidget,
+from PySide6.QtWidgets import ( QMainWindow, QWidget,
                                 QVBoxLayout, QHBoxLayout, QStackedWidget, QSizePolicy)
 from PySide6.QtCore import Qt
 
