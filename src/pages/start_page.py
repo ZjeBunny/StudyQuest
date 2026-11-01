@@ -18,9 +18,6 @@ class StartPage(QWidget):
         super().__init__()
         self.setObjectName("StartPage")
 
-        self.create_ui()
-
-    def create_ui(self):
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(36, 30, 36, 30)
         main_layout.setSpacing(24)
