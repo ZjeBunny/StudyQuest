@@ -1,7 +1,7 @@
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QPropertyAnimation, QEasingCurve
 from PySide6.QtGui import QFont, QFontDatabase
 from PySide6.QtWidgets import (
     QFrame,
@@ -27,7 +27,8 @@ class NavigationButton(QPushButton):
 
         self.icon_label = QLabel(icon)
         self.icon_label.setObjectName("NavIcon")
-        self.icon_label.setFont(QFont(icon_font, 15))
+        self.icon_label.setFont(QFont(icon_font, 12))
+        self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.icon_label.setAttribute(
             Qt.WidgetAttribute.WA_TransparentForMouseEvents
         )
@@ -42,6 +43,28 @@ class NavigationButton(QPushButton):
         layout.addWidget(self.text_label)
         layout.addStretch()
 
+    def set_compact(self, compact):
+        layout = self.layout()
+
+        self.text_label.setVisible(not compact)
+
+        if compact:
+            layout.setContentsMargins(0, 0, 0, 0)
+            layout.setSpacing(0)
+
+            layout.setAlignment(
+                self.icon_label,
+                Qt.AlignmentFlag.AlignCenter
+            )
+
+            layout.removeItem(layout.itemAt(2))
+
+        else:
+            layout.setContentsMargins(14, 0, 12, 0)
+            layout.setSpacing(14)
+
+            layout.addStretch()
+
 
 class Sidebar(QFrame):
     page_changed = Signal(str)
@@ -49,7 +72,17 @@ class Sidebar(QFrame):
     def __init__(self):
         super().__init__()
 
+        self.expanded_width = 240
+        self.compact_width = 68
+        self.is_compact = False
+
         self.setObjectName("Sidebar")
+        self.setMinimumWidth(self.expanded_width)
+        self.setMaximumWidth(self.expanded_width)
+
+        self.animation = QPropertyAnimation(self, b"maximumWidth")
+        self.animation.setDuration(220)
+        self.animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
 
         self.buttons = {}
 
@@ -73,10 +106,10 @@ class Sidebar(QFrame):
         layout.setContentsMargins(12, 20, 12, 16)
         layout.setSpacing(6)
 
-        section = QLabel("Mój obszar")
-        section.setObjectName("SidebarSection")
+        self.section = QLabel("Mój obszar")
+        self.section.setObjectName("SidebarSection")
 
-        layout.addWidget(section)
+        layout.addWidget(self.section)
         layout.addSpacing(8)
 
         navigation = [
@@ -87,21 +120,21 @@ class Sidebar(QFrame):
         ]
 
         for icon, text, key in navigation:
-            button = NavigationButton(
-                icon,
-                text,
-                key,
-                self.icon_font
+            self.add_navigation_button(
+                layout, icon, text, key
             )
-
-            button.clicked.connect(
-                lambda checked=False, k=key: self.page_changed.emit(k)
-            )
-
-            layout.addWidget(button)
-            self.buttons[key] = button
 
         layout.addStretch()
+
+        self.toggle_button = QPushButton("<-")
+        self.toggle_button.setObjectName("SidebarToggle")
+        self.toggle_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.toggle_button.setFont(QFont(self.icon_font, 15))
+        self.toggle_button.setFixedHeight(40)
+        self.toggle_button.clicked.connect(self.toggle_compact)
+
+        layout.addWidget(self.toggle_button)
+        layout.addSpacing(8)
 
         separator = QFrame()
         separator.setObjectName("SidebarSeparator")
@@ -110,21 +143,26 @@ class Sidebar(QFrame):
         layout.addWidget(separator)
         layout.addSpacing(8)
 
-        settings = NavigationButton(
-            "\uf1de",
-            "Ustawienia",
-            "settings",
+        self.add_navigation_button(
+            layout, "\uf1de", "Ustawienia", "settings"
+        )
+
+        self.select("start")
+
+    def add_navigation_button(self, layout, icon, text, key):
+        button = NavigationButton(
+            icon,
+            text,
+            key,
             self.icon_font
         )
 
-        settings.clicked.connect(
-            lambda: self.page_changed.emit("settings")
+        button.clicked.connect(
+            lambda checked=False, k=key: self.page_changed.emit(k)
         )
 
-        layout.addWidget(settings)
-        self.buttons["settings"] = settings
-
-        self.select("start")
+        layout.addWidget(button)
+        self.buttons[key] = button
 
     def select(self, key):
         for name, button in self.buttons.items():
@@ -134,3 +172,29 @@ class Sidebar(QFrame):
             button.style().unpolish(button)
             button.style().polish(button)
             button.update()
+
+    def toggle_compact(self):
+        self.is_compact = not self.is_compact
+
+        target_width = (
+            self.compact_width
+            if self.is_compact
+            else self.expanded_width
+        )
+
+        self.animation.stop()
+
+        self.setMinimumWidth(target_width)
+
+        self.animation.setStartValue(self.width())
+        self.animation.setEndValue(target_width)
+        self.animation.start()
+
+        self.section.setVisible(not self.is_compact)
+
+        for button in self.buttons.values():
+            button.set_compact(self.is_compact)
+
+        self.toggle_button.setText(
+            "->" if self.is_compact else "<-"
+        )

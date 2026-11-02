@@ -229,6 +229,27 @@ QFrame#SidebarSeparator {
     background-color: #292F39;
     border: none;
 }
+
+QPushButton#SidebarToggle {
+    background-color: transparent;
+    border: none;
+    border-radius: 6px;
+    color: #999999;
+    min-height: 40px;
+}
+
+QPushButton#SidebarToggle:hover {
+    background-color: rgba(128, 128, 128, 35);
+    color: white;
+}
+
+QLabel#NavIcon {
+    min-width: 24px;
+}
+
+QPushButton#NavButton {
+    min-height: 42px;
+}
 '''
 
 LIGHT_THEME = '''
@@ -413,5 +434,26 @@ QPushButton#NavButton[selected="true"] QLabel#NavText {
 QFrame#SidebarSeparator {
     background-color: #DFE3E8;
     border: none;
+}
+
+QPushButton#SidebarToggle {
+    background-color: transparent;
+    border: none;
+    border-radius: 6px;
+    color: #999999;
+    min-height: 40px;
+}
+
+QPushButton#SidebarToggle:hover {
+    background-color: rgba(128, 128, 128, 35);
+    color: white;
+}
+
+QLabel#NavIcon {
+    min-width: 24px;
+}
+
+QPushButton#NavButton {
+    min-height: 42px;
 }
 '''

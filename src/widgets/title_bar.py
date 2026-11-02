@@ -20,7 +20,6 @@ class TitleBar(QFrame):
         self.theme_name = theme_name
         self.window = window
         self.drag_position = None
-        self.window = window
 
         self.setObjectName("TitleBar")
         self.setFixedHeight(52)
