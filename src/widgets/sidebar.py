@@ -69,9 +69,10 @@ class NavigationButton(QPushButton):
 class Sidebar(QFrame):
     page_changed = Signal(str)
 
-    def __init__(self):
+    def __init__(self, compact=False, animations=True):
         super().__init__()
 
+        self.animations_enabled = animations
         self.expanded_width = 240
         self.compact_width = 68
         self.is_compact = False
@@ -148,6 +149,8 @@ class Sidebar(QFrame):
         )
 
         self.select("start")
+        if compact:
+            self.set_compact(True, animate=False)
 
     def add_navigation_button(self, layout, icon, text, key):
         button = NavigationButton(
@@ -174,7 +177,15 @@ class Sidebar(QFrame):
             button.update()
 
     def toggle_compact(self):
-        self.is_compact = not self.is_compact
+        self.set_compact(not self.is_compact)
+
+    def set_animations(self, enabled):
+        self.animations_enabled = bool(enabled)
+        if not self.animations_enabled:
+            self.animation.stop()
+
+    def set_compact(self, compact, animate=True):
+        self.is_compact = bool(compact)
 
         target_width = (
             self.compact_width
@@ -185,10 +196,12 @@ class Sidebar(QFrame):
         self.animation.stop()
 
         self.setMinimumWidth(target_width)
-
-        self.animation.setStartValue(self.width())
-        self.animation.setEndValue(target_width)
-        self.animation.start()
+        if animate and self.animations_enabled:
+            self.animation.setStartValue(self.width())
+            self.animation.setEndValue(target_width)
+            self.animation.start()
+        else:
+            self.setMaximumWidth(target_width)
 
         self.section.setVisible(not self.is_compact)
 

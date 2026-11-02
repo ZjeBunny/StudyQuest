@@ -1,0 +1,10 @@
+{
+    "theme": "System",
+    "language": "pl",
+    "font_size": 14,
+    "animations": true,
+    "ollama": {
+        "model": "qwen3:4b",
+        "auto_start": true
+    }
+}
