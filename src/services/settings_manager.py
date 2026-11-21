@@ -11,7 +11,7 @@ DEFAULT_SETTINGS = {
     "animations": True,
     "sidebar_compact": False,
     "ollama": {
-        "model": "qwen3:4b",
+        "model": "qwen3.5:4b",
         "auto_start": True,
         "base_url": "http://localhost:11434"
     }

@@ -8,7 +8,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
     QLabel,
-    QPushButton
+    QPushButton,
+    QWidget
 )
 
 
@@ -17,6 +18,8 @@ class NavigationButton(QPushButton):
         super().__init__()
 
         self.key = key
+        self.is_compact = False
+
         self.setObjectName("NavButton")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setProperty("selected", False)
@@ -28,7 +31,9 @@ class NavigationButton(QPushButton):
         self.icon_label = QLabel(icon)
         self.icon_label.setObjectName("NavIcon")
         self.icon_label.setFont(QFont(icon_font, 12))
-        self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.icon_label.setAlignment(
+            Qt.AlignmentFlag.AlignCenter
+        )
         self.icon_label.setAttribute(
             Qt.WidgetAttribute.WA_TransparentForMouseEvents
         )
@@ -43,27 +48,42 @@ class NavigationButton(QPushButton):
         layout.addWidget(self.text_label)
         layout.addStretch()
 
+        self.set_selected(False)
+
+    def set_selected(self, selected):
+        selected = bool(selected)
+
+        self.setProperty("selected", selected)
+
+        font = self.text_label.font()
+        font.setBold(selected)
+        self.text_label.setFont(font)
+
+        self.style().unpolish(self)
+        self.style().polish(self)
+        self.update()
+
     def set_compact(self, compact):
+        self.is_compact = bool(compact)
+
         layout = self.layout()
 
-        self.text_label.setVisible(not compact)
+        self.text_label.setVisible(not self.is_compact)
 
-        if compact:
+        if self.is_compact:
             layout.setContentsMargins(0, 0, 0, 0)
             layout.setSpacing(0)
-
             layout.setAlignment(
                 self.icon_label,
                 Qt.AlignmentFlag.AlignCenter
             )
-
-            layout.removeItem(layout.itemAt(2))
-
         else:
             layout.setContentsMargins(14, 0, 12, 0)
             layout.setSpacing(14)
-
-            layout.addStretch()
+            layout.setAlignment(
+                self.icon_label,
+                Qt.AlignmentFlag(0)
+            )
 
 
 class Sidebar(QFrame):
@@ -76,14 +96,20 @@ class Sidebar(QFrame):
         self.expanded_width = 240
         self.compact_width = 68
         self.is_compact = False
+        self.active_page = "start"
 
         self.setObjectName("Sidebar")
         self.setMinimumWidth(self.expanded_width)
         self.setMaximumWidth(self.expanded_width)
 
-        self.animation = QPropertyAnimation(self, b"maximumWidth")
+        self.animation = QPropertyAnimation(
+            self,
+            b"maximumWidth"
+        )
         self.animation.setDuration(220)
-        self.animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
+        self.animation.setEasingCurve(
+            QEasingCurve.Type.InOutCubic
+        )
 
         self.buttons = {}
 
@@ -94,10 +120,14 @@ class Sidebar(QFrame):
             / "JetBrainsMonoNerdFont-Regular.ttf"
         )
 
-        font_id = QFontDatabase.addApplicationFont(str(font_path))
+        font_id = QFontDatabase.addApplicationFont(
+            str(font_path)
+        )
 
         if font_id != -1:
-            families = QFontDatabase.applicationFontFamilies(font_id)
+            families = QFontDatabase.applicationFontFamilies(
+                font_id
+            )
             self.icon_font = families[0]
         else:
             self.icon_font = "Segoe UI Symbol"
@@ -122,17 +152,26 @@ class Sidebar(QFrame):
 
         for icon, text, key in navigation:
             self.add_navigation_button(
-                layout, icon, text, key
+                layout,
+                icon,
+                text,
+                key
             )
 
         layout.addStretch()
 
         self.toggle_button = QPushButton("<-")
         self.toggle_button.setObjectName("SidebarToggle")
-        self.toggle_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.toggle_button.setFont(QFont(self.icon_font, 15))
+        self.toggle_button.setCursor(
+            Qt.CursorShape.PointingHandCursor
+        )
+        self.toggle_button.setFont(
+            QFont(self.icon_font, 15)
+        )
         self.toggle_button.setFixedHeight(40)
-        self.toggle_button.clicked.connect(self.toggle_compact)
+        self.toggle_button.clicked.connect(
+            self.toggle_compact
+        )
 
         layout.addWidget(self.toggle_button)
         layout.addSpacing(8)
@@ -145,14 +184,27 @@ class Sidebar(QFrame):
         layout.addSpacing(8)
 
         self.add_navigation_button(
-            layout, "\uf1de", "Ustawienia", "settings"
+            layout,
+            "\uf1de",
+            "Ustawienia",
+            "settings"
         )
 
         self.select("start")
-        if compact:
-            self.set_compact(True, animate=False)
 
-    def add_navigation_button(self, layout, icon, text, key):
+        if compact:
+            self.set_compact(
+                True,
+                animate=False
+            )
+
+    def add_navigation_button(
+        self,
+        layout,
+        icon,
+        text,
+        key
+    ):
         button = NavigationButton(
             icon,
             text,
@@ -161,26 +213,33 @@ class Sidebar(QFrame):
         )
 
         button.clicked.connect(
-            lambda checked=False, k=key: self.page_changed.emit(k)
+            lambda checked=False, k=key:
+                self.page_changed.emit(k)
         )
 
         layout.addWidget(button)
         self.buttons[key] = button
 
     def select(self, key):
-        for name, button in self.buttons.items():
-            selected = name == key
+        if key not in self.buttons:
+            return
 
-            button.setProperty("selected", selected)
-            button.style().unpolish(button)
-            button.style().polish(button)
-            button.update()
+        self.active_page = key
+
+        for name, button in self.buttons.items():
+            button.set_selected(name == key)
+
+    def set_active_page(self, page_name):
+        self.select(page_name)
 
     def toggle_compact(self):
-        self.set_compact(not self.is_compact)
+        self.set_compact(
+            not self.is_compact
+        )
 
     def set_animations(self, enabled):
         self.animations_enabled = bool(enabled)
+
         if not self.animations_enabled:
             self.animation.stop()
 
@@ -196,17 +255,28 @@ class Sidebar(QFrame):
         self.animation.stop()
 
         self.setMinimumWidth(target_width)
+
         if animate and self.animations_enabled:
-            self.animation.setStartValue(self.width())
-            self.animation.setEndValue(target_width)
+            self.animation.setStartValue(
+                self.width()
+            )
+            self.animation.setEndValue(
+                target_width
+            )
             self.animation.start()
         else:
-            self.setMaximumWidth(target_width)
+            self.setMaximumWidth(
+                target_width
+            )
 
-        self.section.setVisible(not self.is_compact)
+        self.section.setVisible(
+            not self.is_compact
+        )
 
         for button in self.buttons.values():
-            button.set_compact(self.is_compact)
+            button.set_compact(
+                self.is_compact
+            )
 
         self.toggle_button.setText(
             "->" if self.is_compact else "<-"

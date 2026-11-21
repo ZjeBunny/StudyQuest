@@ -123,17 +123,28 @@ class TitleBar(QFrame):
     def set_page(self, name):
         self.current_page.setText(name)
 
-    def set_ai_status(self, online):
+    
+    def set_ai_status(self, online, message=""):
         if online:
             self.ai_status.setText("● AI Online")
-            self.ai_status.setStyleSheet(
-                "color: #65C98A; font-size: 11px; padding: 0 8px;"
-            )
+            color = "#65C98A"
         else:
             self.ai_status.setText("● AI Offline")
-            self.ai_status.setStyleSheet(
-                "color: #E47777; font-size: 11px; padding: 0 8px;"
+            color = "#E47777"
+
+        self.ai_status.setStyleSheet(
+            f"color: {color}; "
+            "font-size: 11px; "
+            "padding: 0 8px;"
+        )
+
+        self.ai_status.setToolTip(
+            message or (
+                "Model AI jest gotowy"
+                if online
+                else "Model AI jest niedostępny"
             )
+        )
 
     def toggle_search(self):
         visible = self.search_input.isVisible()

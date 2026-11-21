@@ -14,6 +14,7 @@ from pages.quiz import QuizPage
 from pages.study import StudyPage
 from pages.settings import SettingsPage
 from themes.theme import DARK_THEME, LIGHT_THEME
+from services.ai_status_service import AIStatusService
 
 
 class MainWindow(QMainWindow):
@@ -37,6 +38,17 @@ class MainWindow(QMainWindow):
         self.title_bar = TitleBar(self, theme_name)
         main_layout.addWidget(self.title_bar)
 
+        self.ai_status_service = AIStatusService(
+            base_url="http://localhost:11434",
+            model=self.settings_mng.get_ollama("model") or "qwen3.5:4b",
+            parent=self
+        )
+
+        self.ai_status_service.status_changed.connect(
+            self.title_bar.set_ai_status
+        )
+
+        self.ai_status_service.start()
         body = QHBoxLayout()
         body.setContentsMargins(0, 0, 0, 0)
         body.setSpacing(0)
@@ -50,10 +62,11 @@ class MainWindow(QMainWindow):
 
         self.stack = QStackedWidget()
         self.start_page = StartPage()
-        self.notes_page = NotesPage()
+        self.notes_page = NotesPage(self.settings_mng)
         self.quiz_page = QuizPage()
         self.study_page = StudyPage()
         self.settings_page = SettingsPage(self.settings_mng)
+        self.notes_page.quiz_requested.connect(self.quiz_page.start_quiz)
 
         for page in (
             self.start_page, self.notes_page, self.quiz_page,
