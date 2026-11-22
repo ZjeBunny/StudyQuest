@@ -338,6 +338,44 @@ QWidget#NotesPage QPushButton {
 QWidget#NotesPage QListWidget::item {
     padding: 9px;
 }
+
+/* Study chat: flexible history and compact composer */
+QTextBrowser#StudyConversation {
+    background: #181b1f;
+    border: 1px solid #30353c;
+    border-radius: 12px;
+    padding: 10px;
+}
+QFrame#StudyComposer {
+    background: #181b1f;
+    border: 1px solid #30353c;
+    border-radius: 12px;
+}
+QTextEdit#StudyQuestion {
+    border: none;
+    background: transparent;
+    padding: 5px;
+}
+QLabel#StudyStatus { color: #94a3b8; font-size: 12px; }
+
+/* Study chat: flexible history and compact composer */
+QTextBrowser#StudyConversation {
+    background: #181b1f;
+    border: 1px solid #30353c;
+    border-radius: 12px;
+    padding: 10px;
+}
+QFrame#StudyComposer {
+    background: #181b1f;
+    border: 1px solid #30353c;
+    border-radius: 12px;
+}
+QTextEdit#StudyQuestion {
+    border: none;
+    background: transparent;
+    padding: 5px;
+}
+QLabel#StudyStatus { color: #94a3b8; font-size: 12px; }
 '''
 
 

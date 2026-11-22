@@ -10,7 +10,7 @@ from services.notes_storage import NotesStorage
 from widgets.note.note_editor import NoteEditor
 from widgets.note.note_toolbar import NoteToolbar
 from widgets.note.note_sidebar import NoteSidebar
-from ai.tools import AIWorker
+from ai.tools import AIWorker, ai_gate
 
 
 class NotesPage(QWidget):
@@ -27,6 +27,7 @@ class NotesPage(QWidget):
         self.last_saved_html = None
         self.last_analyzed_html = None
         self.workers = []
+        ai_gate.busy_changed.connect(self._ai_busy_changed)
 
         root = QVBoxLayout(self)
         root.setContentsMargins(30, 26, 30, 26)
@@ -182,8 +183,18 @@ class NotesPage(QWidget):
         vision = self.settings_mng.get_ollama("vision_model", "gemma3:4b") if self.settings_mng else "gemma3:4b"
         return {"base_url": base_url, "model": model, "vision_model": vision}
 
+    def _ai_busy_changed(self, busy):
+        self.ai_button.setEnabled(not busy)
+
     def run_ai(self, operation, *args, success=None):
+        if not ai_gate.claim():
+            self.save_status.setText("AI jest zajęte innym zadaniem — poczekaj.")
+            return
         worker = AIWorker(operation, *args, **self.ai_config(), parent=self)
+        if operation == "analyze_note":
+            self.ai_button.setEnabled(False)
+            self.ai_button.setText("AI: analizowanie…")
+            self.save_status.setText("AI analizuje notatkę…")
         worker.succeeded.connect(
             lambda result, w=worker: self._worker_success(w, result, success)
         )
@@ -192,13 +203,22 @@ class NotesPage(QWidget):
         )
         worker.finished.connect(lambda w=worker: self._forget_worker(w))
         self.workers.append(worker)
-        worker.start()
+        try:
+            worker.start()
+        except Exception:
+            ai_gate.release()
+            raise
 
     def _worker_success(self, worker, result, callback):
+        if worker.operation == "analyze_note":
+            self.ai_button.setText("AI: analizuj")
+            self.save_status.setText("Analiza AI zakończona")
         if callback:
             callback(result)
 
     def _worker_failed(self, worker, error):
+        if worker.operation == "analyze_note":
+            self.ai_button.setText("AI: analizuj")
         self.save_status.setText("AI: wystąpił problem")
         QMessageBox.warning(self, "Asystent AI", error)
 
@@ -396,11 +416,11 @@ class NotesPage(QWidget):
             self.save_status.setText("Zapisano · analiza starszej wersji pominięta")
 
     def analyze_now(self):
-        if self.dirty:
-            self.save_current_note()
         text = self.note_text()
         if not text:
             QMessageBox.information(self, "AI", "Najpierw wpisz treść notatki.")
+            return
+        if not self.ai_button.isEnabled():
             return
         self.run_ai(
             "analyze_note", self.title_input.text(), text,

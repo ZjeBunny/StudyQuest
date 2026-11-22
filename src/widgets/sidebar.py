@@ -2,7 +2,8 @@
 from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal, QPropertyAnimation, QEasingCurve
-from PySide6.QtGui import QFont, QFontDatabase
+from PySide6.QtGui import QFont, QFontDatabase, QPixmap, QPainter
+from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
     QFrame,
     QVBoxLayout,
@@ -31,6 +32,18 @@ class NavigationButton(QPushButton):
         self.icon_label = QLabel(icon)
         self.icon_label.setObjectName("NavIcon")
         self.icon_label.setFont(QFont(icon_font, 12))
+        if key == "profile":
+            icon_path = Path(__file__).resolve().parents[2] / "assets/icons/trophy.svg"
+            renderer = QSvgRenderer(str(icon_path))
+            if renderer.isValid():
+                pixmap = QPixmap(24, 24)
+                pixmap.fill(Qt.GlobalColor.transparent)
+                painter = QPainter(pixmap)
+                renderer.render(painter)
+                painter.end()
+                self.icon_label.setText("")
+                self.icon_label.setPixmap(pixmap)
+            # If the SVG is missing, keep the Nerd Font star as a fallback.
         self.icon_label.setAlignment(
             Qt.AlignmentFlag.AlignCenter
         )
@@ -148,7 +161,7 @@ class Sidebar(QFrame):
             ("\uf19d", "Nauka", "study"),
             ("\uf249", "Notatki", "notes"),
             ("\uf0cb", "Quizy", "quiz"),
-            ("\uf091", "Moja przygoda", "profile")
+            ("\uf005", "Moja przygoda", "profile")
         ]
 
         for icon, text, key in navigation:

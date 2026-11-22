@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
     QButtonGroup, QMessageBox, QComboBox, QProgressBar, QStackedWidget,
     QFrame
 )
-from ai.tools import AIWorker
+from ai.tools import AIWorker, ai_gate
 from services.progress import ProgressStore
 from time import monotonic
 from database.notes_repository import NotesRepository
@@ -37,6 +37,7 @@ class QuizPage(QWidget):
         self.storage = NotesStorage()
         self.worker = None
         self.busy = False
+        ai_gate.busy_changed.connect(self._ai_busy_changed)
         self.mode = None
         self.questions = []
         self.cards = []
@@ -220,6 +221,11 @@ class QuizPage(QWidget):
             "vision_model": self.settings.get_ollama("vision_model", "gemma3:4b")
         }
 
+    def _ai_busy_changed(self, busy):
+        self.generate.setEnabled(not busy)
+        self.quiz_choice.setEnabled(not busy)
+        self.flash_choice.setEnabled(not busy)
+
     def generate_material(self):
         if self.busy:
             return
@@ -227,6 +233,9 @@ class QuizPage(QWidget):
             title, material = self.selected_material()
         except ValueError as error:
             QMessageBox.information(self, "Materiał", str(error))
+            return
+        if not ai_gate.claim():
+            self.status.setText("AI jest zajęte innym zadaniem — poczekaj.")
             return
         self.clear_results()
         self.busy = True
@@ -246,13 +255,17 @@ class QuizPage(QWidget):
         worker.failed.connect(self.generation_failed)
         worker.finished.connect(self.generation_finished)
         worker.finished.connect(worker.deleteLater)
-        worker.start()
+        try:
+            worker.start()
+        except Exception:
+            ai_gate.release()
+            raise
 
     def generation_finished(self):
         self.busy = False
-        self.generate.setEnabled(True)
-        self.quiz_choice.setEnabled(True)
-        self.flash_choice.setEnabled(True)
+        self.generate.setEnabled(not ai_gate._lock.locked())
+        self.quiz_choice.setEnabled(not ai_gate._lock.locked())
+        self.flash_choice.setEnabled(not ai_gate._lock.locked())
         self.category.setEnabled(True)
         self.source.setEnabled(True)
         self.progress.hide()

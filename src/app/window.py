@@ -99,6 +99,7 @@ class MainWindow(QMainWindow):
         self.notifications = []
         self.title_bar.search_requested.connect(self.search_everywhere)
         self.title_bar.notifications_requested.connect(self.show_notifications)
+        self.statusBar().hide()  # Bez dodatkowego dolnego paska zajmującego miejsce
         self.quiz_page.activity.connect(self.notify)
         self.study_page.activity.connect(self.notify)
         self.change_page("start")
@@ -134,7 +135,7 @@ class MainWindow(QMainWindow):
         self.notifications.insert(0, f"{stamp}  {message}")
         self.notifications = self.notifications[:50]
         self.title_bar.notification_button.setToolTip(f"Powiadomienia ({len(self.notifications)}) — {message}")
-        self.statusBar().showMessage(message, 7000)
+        self.statusBar().hide()  # Powiadomienia są dostępne przez ikonę w pasku tytułu
 
     def show_notifications(self):
         QMessageBox.information(self, "Powiadomienia", "\n\n".join(self.notifications[:12]) if self.notifications else "Brak powiadomień.")
