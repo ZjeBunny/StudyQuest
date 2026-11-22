@@ -33,6 +33,9 @@ class NotesRepository:
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS categories (
+                    name TEXT PRIMARY KEY
+                );
                 CREATE TABLE IF NOT EXISTS tags (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT NOT NULL UNIQUE
@@ -58,6 +61,7 @@ class NotesRepository:
 
     def create(self, note_id, title, category, content_path, tags=None):
         now = self.now()
+        self.add_category(category)
         with self.connect() as db:
             db.execute(
                 "INSERT INTO notes(id,title,category,content_path,created_at,updated_at) "
@@ -67,6 +71,7 @@ class NotesRepository:
             self._replace_tags(db, note_id, tags or [])
 
     def update(self, note_id, title, category, content_path, tags=None):
+        self.add_category(category)
         with self.connect() as db:
             db.execute(
                 "UPDATE notes SET title=?, category=?, content_path=?, updated_at=? WHERE id=?",
@@ -125,12 +130,64 @@ class NotesRepository:
             result["tags"] = [item["name"] for item in tags]
             return result
 
+    def add_category(self, category):
+        category = category.strip()
+        if not category:
+            raise ValueError("Nazwa kategorii nie może być pusta.")
+        with self.connect() as db:
+            existing = db.execute(
+                "SELECT name FROM categories WHERE name = ? COLLATE NOCASE", (category,)
+            ).fetchone()
+            if existing:
+                return existing["name"]
+            db.execute("INSERT INTO categories(name) VALUES(?)", (category,))
+        return category
+
+    def rename_category(self, old_name, new_name):
+        new_name = new_name.strip()
+        if not new_name:
+            raise ValueError("Nazwa kategorii nie może być pusta.")
+        if old_name == new_name:
+            return
+        with self.connect() as db:
+            duplicate = db.execute(
+                "SELECT name FROM categories WHERE name = ? COLLATE NOCASE AND name != ?",
+                (new_name, old_name)
+            ).fetchone()
+            if duplicate:
+                raise ValueError("Kategoria o tej nazwie już istnieje.")
+            db.execute("INSERT OR IGNORE INTO categories(name) VALUES(?)", (new_name,))
+            db.execute("UPDATE notes SET category=? WHERE category=?", (new_name, old_name))
+            db.execute("DELETE FROM categories WHERE name=?", (old_name,))
+
+    def search_notes(self, query="", category="Wszystkie"):
+        """Match note titles/tags or the category name, including empty categories."""
+        query = query.strip().casefold()
+        categories = self.categories()
+        if category != "Wszystkie":
+            categories = [name for name in categories if name == category]
+        notes = self.list_notes(category=category)
+        if not query:
+            return notes, categories
+        matching_categories = {name for name in categories if query in name.casefold()}
+        matched = [note for note in notes if (
+            note["category"] in matching_categories
+            or query in note["title"].casefold()
+            or query in (note.get("tags") or "").casefold()
+        )]
+        visible = sorted(matching_categories | {n["category"] for n in matched}, key=str.casefold)
+        return matched, visible
+
     def categories(self):
         with self.connect() as db:
             rows = db.execute(
-                "SELECT DISTINCT category FROM notes ORDER BY category"
+                "SELECT name FROM categories UNION SELECT category FROM notes ORDER BY 1"
             ).fetchall()
-            return [row["category"] for row in rows]
+            return [row[0] for row in rows]
+
+    def remove_category(self, category):
+        with self.connect() as db:
+            db.execute("DELETE FROM categories WHERE name=?", (category,))
 
     def delete(self, note_id):
         with self.connect() as db:

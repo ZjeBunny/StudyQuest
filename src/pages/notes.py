@@ -3,7 +3,7 @@ from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QComboBox, QSplitter, QMessageBox, QInputDialog,
-    QFileDialog, QDialog, QTextBrowser, QDialogButtonBox
+    QFileDialog, QDialog, QTextBrowser, QDialogButtonBox, QStackedWidget, QFrame
 )
 from database.notes_repository import NotesRepository
 from services.notes_storage import NotesStorage
@@ -59,15 +59,59 @@ class NotesPage(QWidget):
         filters.addWidget(self.search, 1)
         filters.addWidget(self.category_filter)
         filters.addWidget(self.add_category_button)
-        root.addLayout(filters)
+
+        self.views = QStackedWidget()
+        root.addWidget(self.views, 1)
+        browser = QWidget()
+        browser_layout = QVBoxLayout(browser)
+        browser_layout.setContentsMargins(0, 0, 0, 0)
+        browser_layout.setSpacing(12)
+        browser_layout.addLayout(filters)
+        self.note_sidebar = NoteSidebar()
+        self.note_sidebar.note_selected.connect(self.show_note_actions)
+        self.note_sidebar.new_note_requested.connect(self.new_note)
+        self.note_sidebar.delete_category_requested.connect(self.delete_category)
+        self.note_sidebar.rename_category_requested.connect(self.rename_category)
+        self.note_sidebar.new_note_in_category_requested.connect(self.new_note)
+        browser_layout.addWidget(self.note_sidebar, 1)
+        self.views.addWidget(browser)
+
+        actions = QWidget()
+        actions_layout = QVBoxLayout(actions)
+        actions_layout.setSpacing(16)
+        back_actions = QPushButton("← Wszystkie notatki")
+        back_actions.clicked.connect(self.show_browser)
+        actions_layout.addWidget(back_actions, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.selected_note_title = QLabel()
+        self.selected_note_title.setObjectName("PageTitle")
+        actions_layout.addWidget(self.selected_note_title)
+        self.selected_note_category = QLabel()
+        self.selected_note_category.setObjectName("PageSubtitle")
+        actions_layout.addWidget(self.selected_note_category)
+        for label, method, primary in (
+            ("✎  Edytuj notatkę", self.edit_selected_note, True),
+            ("✓  Wygeneruj quiz", lambda: self.request_quiz("quiz"), False),
+            ("▤  Wygeneruj fiszki", lambda: self.request_quiz("flashcards"), False),
+            ("🗑  Usuń notatkę", self.delete_note, False),
+        ):
+            button = QPushButton(label)
+            button.setMinimumHeight(52)
+            if primary:
+                button.setObjectName("PrimaryButton")
+            button.clicked.connect(method)
+            actions_layout.addWidget(button)
+        actions_layout.addStretch(1)
+        self.views.addWidget(actions)
+
+        editor_screen = QWidget()
+        editor_screen_layout = QVBoxLayout(editor_screen)
+        editor_screen_layout.setContentsMargins(0, 0, 0, 0)
+        editor_back = QPushButton("← Wróć do notatek")
+        editor_back.clicked.connect(self.show_browser)
+        editor_screen_layout.addWidget(editor_back, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.views.addWidget(editor_screen)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
-        self.note_sidebar = NoteSidebar()
-        self.note_sidebar.note_selected.connect(self.open_note)
-        self.note_sidebar.new_note_requested.connect(self.new_note)
-        self.note_sidebar.delete_note_requested.connect(self.delete_note)
-        splitter.addWidget(self.note_sidebar)
-
         editor_panel = QWidget()
         editor_layout = QVBoxLayout(editor_panel)
         editor_layout.setContentsMargins(8, 0, 0, 0)
@@ -80,10 +124,7 @@ class NotesPage(QWidget):
         meta = QHBoxLayout()
         self.category_input = QComboBox()
         self.category_input.setEditable(True)
-        self.category_input.addItems([
-            "Bez kategorii", "Matematyka", "Fizyka", "Chemia", "Informatyka",
-            "Języki obce", "Historia", "Biologia"
-        ])
+        self.category_input.addItem("Bez kategorii")
         self.tags_input = QLineEdit()
         self.tags_input.setPlaceholderText("Tagi, oddzielone przecinkami")
         meta.addWidget(QLabel("Kategoria"))
@@ -113,10 +154,7 @@ class NotesPage(QWidget):
         editor_layout.addWidget(self.toolbar)
         editor_layout.addLayout(tools_row)
         editor_layout.addWidget(self.editor, 1)
-        splitter.addWidget(editor_panel)
-        splitter.setStretchFactor(0, 1)
-        splitter.setStretchFactor(1, 3)
-        root.addWidget(splitter, 1)
+        editor_screen_layout.addWidget(editor_panel, 1)
 
         self.autosave_timer = QTimer(self)
         self.autosave_timer.setSingleShot(True)
@@ -128,11 +166,8 @@ class NotesPage(QWidget):
 
         self.refresh_categories()
         self.refresh_notes()
-        notes = self.repository.list_notes()
-        if notes:
-            self.open_note(notes[0]["id"])
-        else:
-            self.new_note()
+        self.selected_note_id = None
+        self.views.setCurrentIndex(0)
 
     def ai_config(self):
         base_url = self.settings_mng.get_ollama(
@@ -203,30 +238,102 @@ class NotesPage(QWidget):
 
     def refresh_categories(self):
         current = self.category_filter.currentText()
+        editing = self.category_input.currentText() if hasattr(self, "category_input") else ""
         self.category_filter.blockSignals(True)
         self.category_filter.clear()
         self.category_filter.addItem("Wszystkie")
-        self.category_filter.addItems(self.repository.categories())
+        categories = self.repository.categories()
+        self.category_filter.addItems(categories)
         index = self.category_filter.findText(current)
         self.category_filter.setCurrentIndex(max(0, index))
         self.category_filter.blockSignals(False)
+        if hasattr(self, "category_input"):
+            self.category_input.blockSignals(True)
+            self.category_input.clear()
+            self.category_input.addItems(categories)
+            if editing and editing not in categories:
+                self.category_input.addItem(editing)
+            self.category_input.setCurrentText(editing or "Bez kategorii")
+            self.category_input.blockSignals(False)
 
     def refresh_notes(self, *_):
-        notes = self.repository.list_notes(
-            self.search.text() if hasattr(self, "search") else "",
-            self.category_filter.currentText()
-            if hasattr(self, "category_filter") and self.category_filter.count()
-            else "Wszystkie"
-        )
-        self.note_sidebar.set_notes(notes, self.current_note_id)
+        query = self.search.text().strip()
+        category = self.category_filter.currentText() or "Wszystkie"
+        notes, categories = self.repository.search_notes(query, category)
+        self.note_sidebar.set_notes(notes, self.current_note_id, categories)
 
-    def new_note(self):
+    def show_browser(self):
+        if self.dirty:
+            self.save_current_note()
+        self.refresh_categories()
+        self.refresh_notes()
+        self.views.setCurrentIndex(0)
+
+    def show_note_actions(self, note_id):
+        if self.dirty:
+            self.save_current_note()
+        note = self.repository.get(note_id)
+        if not note:
+            return
+        self.selected_note_id = note_id
+        self.selected_note_title.setText(note["title"])
+        self.selected_note_category.setText("Kategoria: " + note["category"])
+        self.views.setCurrentIndex(1)
+
+    def edit_selected_note(self):
+        if self.selected_note_id:
+            self.open_note(self.selected_note_id)
+            self.views.setCurrentIndex(2)
+
+    def request_quiz(self, mode):
+        if not self.selected_note_id:
+            return
+        note = self.repository.get(self.selected_note_id)
+        if note:
+            self.page_requested.emit("quiz")
+            window = self.window()
+            quiz = getattr(window, "quiz_page", None)
+            if quiz:
+                quiz.choose_mode(mode)
+                quiz.category.setCurrentIndex(max(0, quiz.category.findData(note["category"])))
+                quiz.source.setCurrentIndex(max(0, quiz.source.findData(note["id"])))
+
+    def delete_category(self, category):
+        if category == "Bez kategorii":
+            QMessageBox.information(self, "Kategoria", "Nie można usunąć kategorii domyślnej.")
+            return
+        if self.dirty:
+            self.save_current_note()
+        notes = self.repository.list_notes(category=category)
+        answer = QMessageBox.warning(
+            self, "Usuń całą kategorię",
+            f"Usunąć kategorię „{category}” i wszystkie jej notatki ({len(notes)})?\n"
+            "Ta operacja jest nieodwracalna.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        self.autosave_timer.stop()
+        if self.current_note_id in {note["id"] for note in notes}:
+            self.current_note_id = None
+            self.dirty = False
+        for note in notes:
+            self.repository.delete(note["id"])
+            self.storage.delete(note["content_path"])
+        self.repository.remove_category(category)
+        self.selected_note_id = None
+        self.refresh_categories()
+        self.refresh_notes()
+        self.views.setCurrentIndex(0)
+
+    def new_note(self, category=None):
         if self.dirty:
             self.save_current_note()
         self.current_note_id = self.storage.new_id()
         self.loading_note = True
         self.title_input.clear()
-        self.category_input.setCurrentText("Bez kategorii")
+        self.category_input.setCurrentText(category if isinstance(category, str) and category else "Bez kategorii")
         self.tags_input.clear()
         self.editor.clear()
         self.last_saved_html = None
@@ -234,6 +341,7 @@ class NotesPage(QWidget):
         self.loading_note = False
         self.dirty = True
         self.save_status.setText("Nowa notatka")
+        self.views.setCurrentIndex(2)
         self.title_input.setFocus()
         self.autosave_timer.start()
 
@@ -332,33 +440,77 @@ class NotesPage(QWidget):
                 .replace(">", "&gt;").replace('"', "&quot;"))
 
     def delete_note(self):
-        if not self.current_note_id:
+        note_id = self.selected_note_id or self.current_note_id
+        if not note_id:
             return
-        note = self.repository.get(self.current_note_id)
+        note = self.repository.get(note_id)
         if not note:
             return
         answer = QMessageBox.question(
-            self, "Usuń notatkę", "Czy na pewno chcesz usunąć tę notatkę?"
+            self, "Usuń notatkę", f"Czy na pewno usunąć notatkę „{note['title']}”?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel,
         )
         if answer != QMessageBox.StandardButton.Yes:
             return
         self.autosave_timer.stop()
-        self.repository.delete(self.current_note_id)
+        self.repository.delete(note_id)
         self.storage.delete(note["content_path"])
-        self.current_note_id = None
-        self.dirty = False
+        if self.current_note_id == note_id:
+            self.current_note_id = None
+            self.dirty = False
+        self.selected_note_id = None
         self.refresh_categories()
         self.refresh_notes()
-        remaining = self.repository.list_notes()
-        if remaining:
-            self.open_note(remaining[0]["id"])
-        else:
-            self.new_note()
+        self.views.setCurrentIndex(0)
 
     def add_category(self):
+        name, accepted = QInputDialog.getText(self, "Nowa kategoria", "Nazwa kategorii:")
+        if not accepted:
+            return
+        name = name.strip()
+        if not name:
+            QMessageBox.information(self, "Kategoria", "Podaj nazwę kategorii.")
+            return
+        existing = next((c for c in self.repository.categories() if c.casefold() == name.casefold()), None)
+        if existing:
+            QMessageBox.information(self, "Kategoria", f"Kategoria „{existing}” już istnieje.")
+            self.category_filter.setCurrentText(existing)
+            return
+        self.repository.add_category(name)
+        self.refresh_categories()
+        self.category_filter.setCurrentText(name)
+        self.refresh_notes()
+
+    def rename_category(self, old_name):
+        if old_name == "Bez kategorii":
+            QMessageBox.information(self, "Kategoria", "Nie można zmienić nazwy kategorii domyślnej.")
+            return
         name, accepted = QInputDialog.getText(
-            self, "Nowa kategoria", "Nazwa kategorii:"
+            self, "Zmień nazwę kategorii", "Nowa nazwa:", text=old_name
         )
-        if accepted and name.strip():
-            self.category_input.setCurrentText(name.strip())
-            self.schedule_save()
+        if not accepted or not name.strip():
+            return
+        name = name.strip()
+        if name != old_name and any(c.casefold() == name.casefold() for c in self.repository.categories()):
+            QMessageBox.warning(self, "Kategoria", "Kategoria o tej nazwie już istnieje.")
+            return
+        # Save pending edits before moving files to the renamed category.
+        if self.dirty:
+            self.save_current_note()
+        self.repository.rename_category(old_name, name)
+        for note in self.repository.list_notes(category=name):
+            if note["category"] != name:
+                continue
+            old_path = note["content_path"]
+            html = self.storage.load(old_path)
+            new_path = self.storage.save(note["id"], name, html)
+            self.repository.update(note["id"], note["title"], name, new_path,
+                                   self.repository.get(note["id"])["tags"])
+            if old_path != new_path:
+                self.storage.delete(old_path)
+        if self.current_note_id and self.repository.get(self.current_note_id) and self.repository.get(self.current_note_id)["category"] == name:
+            self.category_input.setCurrentText(name)
+        self.refresh_categories()
+        self.category_filter.setCurrentText(name)
+        self.refresh_notes()
