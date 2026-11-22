@@ -15,7 +15,6 @@ from ai.tools import AIWorker
 
 class NotesPage(QWidget):
     page_requested = Signal(str)
-    quiz_requested = Signal(str, object)
 
     def __init__(self, settings_mng=None):
         super().__init__()
@@ -37,7 +36,7 @@ class NotesPage(QWidget):
         title_box = QVBoxLayout()
         title = QLabel("Notatki")
         title.setObjectName("PageTitle")
-        subtitle = QLabel("Twórz materiały, analizuj je z AI i zamieniaj w questy.")
+        subtitle = QLabel("Twórz i analizuj notatki. Quizy oraz fiszki generuj w zakładce Quizy.")
         subtitle.setObjectName("PageSubtitle")
         title_box.addWidget(title)
         title_box.addWidget(subtitle)
@@ -99,19 +98,12 @@ class NotesPage(QWidget):
         tools_row = QHBoxLayout()
         self.ai_button = QPushButton("AI: analizuj")
         self.ai_button.clicked.connect(self.analyze_now)
-        self.quiz_button = QPushButton("Utwórz quiz")
-        self.quiz_button.clicked.connect(self.create_quiz)
-        self.flashcards_button = QPushButton("Fiszki")
-        self.flashcards_button.clicked.connect(self.create_flashcards)
         self.pdf_button = QPushButton("Eksport PDF")
         self.pdf_button.clicked.connect(self.export_pdf)
         self.import_button = QPushButton("Importuj PDF/obraz")
         self.import_button.clicked.connect(self.import_source)
-        self.web_button = QPushButton("Szukaj w internecie")
-        self.web_button.clicked.connect(self.search_web)
         for button in (
-            self.ai_button, self.quiz_button, self.flashcards_button,
-            self.pdf_button, self.import_button, self.web_button
+            self.ai_button, self.pdf_button, self.import_button
         ):
             tools_row.addWidget(button)
         tools_row.addStretch()
@@ -149,7 +141,11 @@ class NotesPage(QWidget):
         model = self.settings_mng.get_ollama(
             "model", "qwen3.5:4b"
         ) if self.settings_mng else "qwen3.5:4b"
-        return {"base_url": base_url, "model": model}
+        lightweight = self.settings_mng.get("lightweight", False) if self.settings_mng else False
+        if lightweight:
+            model = self.settings_mng.get_ollama("light_model", "qwen3:1.7b")
+        vision = self.settings_mng.get_ollama("vision_model", "gemma3:4b") if self.settings_mng else "gemma3:4b"
+        return {"base_url": base_url, "model": model, "vision_model": vision}
 
     def run_ai(self, operation, *args, success=None):
         worker = AIWorker(operation, *args, **self.ai_config(), parent=self)
@@ -281,16 +277,9 @@ class NotesPage(QWidget):
             self.repository.create(self.current_note_id, title, category, path, tags)
         self.last_saved_html = html
         self.dirty = False
-        self.save_status.setText("Zapisano · AI analizuje..." if content_changed else "Wszystkie zmiany zapisane")
+        self.save_status.setText("Zapisano")
         self.refresh_categories()
         self.refresh_notes()
-        if content_changed and self.note_text():
-            self.last_analyzed_html = html
-            self.run_ai(
-                "analyze_note", title, self.note_text(),
-                success=lambda result: self._analysis_finished(result, html)
-            )
-
     def _analysis_finished(self, result, analyzed_html):
         if analyzed_html == self.editor.toHtml():
             self.save_status.setText("Zapisano · analiza AI gotowa")
@@ -309,42 +298,6 @@ class NotesPage(QWidget):
             "analyze_note", self.title_input.text(), text,
             success=lambda result: self.show_ai_result(result, "Analiza notatki przez Qwen")
         )
-
-    def create_quiz(self):
-        if self.dirty:
-            self.save_current_note()
-        text = self.note_text()
-        if not text:
-            QMessageBox.information(self, "Quiz", "Notatka jest pusta.")
-            return
-        self.quiz_button.setEnabled(False)
-        self.run_ai(
-            "generate_quiz", self.title_input.text(), text, 8,
-            success=self._quiz_ready
-        )
-
-    def _quiz_ready(self, questions):
-        self.quiz_button.setEnabled(True)
-        self.quiz_requested.emit(self.title_input.text() or "Nowy quest", questions)
-        self.page_requested.emit("quiz")
-
-    def create_flashcards(self):
-        if self.dirty:
-            self.save_current_note()
-        text = self.note_text()
-        if not text:
-            QMessageBox.information(self, "Fiszki", "Notatka jest pusta.")
-            return
-        self.run_ai(
-            "generate_flashcards", self.title_input.text(), text, 12,
-            success=self._flashcards_ready
-        )
-
-    def _flashcards_ready(self, cards):
-        lines = []
-        for index, card in enumerate(cards, 1):
-            lines.append(f"**{index}. {card.get('front', '')}**\n\n{card.get('back', '')}")
-        self.show_ai_result("\n\n---\n\n".join(lines), "Fiszki z notatki")
 
     def export_pdf(self):
         if self.dirty:
@@ -377,34 +330,6 @@ class NotesPage(QWidget):
     def _escape_html(text):
         return (str(text).replace("&", "&amp;").replace("<", "&lt;")
                 .replace(">", "&gt;").replace('"', "&quot;"))
-
-    def search_web(self):
-        query, accepted = QInputDialog.getText(
-            self, "Wyszukiwanie w internecie", "Czego szukać?"
-        )
-        if not accepted or not query.strip():
-            return
-        self.run_ai(
-            "search_web", query.strip(),
-            success=lambda results: self._web_results_ready(query, results)
-        )
-
-    def _web_results_ready(self, query, results):
-        if not results:
-            QMessageBox.information(self, "Wyniki wyszukiwania", "Nie znaleziono wyników.")
-            return
-        html = "<h2>Wyniki: " + self._escape_html(query) + "</h2>"
-        for title, url in results:
-            html += (
-                '<p><a href="' + self._escape_html(url) + '">'
-                + self._escape_html(title) + "</a></p>"
-            )
-        dialog = QMessageBox(self)
-        dialog.setWindowTitle("Wyniki wyszukiwania")
-        dialog.setTextFormat(Qt.TextFormat.RichText)
-        dialog.setText(html)
-        dialog.setInformativeText("Wyniki możesz otworzyć w przeglądarce lub dodać do notatki ręcznie.")
-        dialog.exec()
 
     def delete_note(self):
         if not self.current_note_id:

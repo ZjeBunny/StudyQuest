@@ -51,6 +51,7 @@ class SettingsPage(QWidget):
     animations_changed = Signal(bool)
     sidebar_compact_changed = Signal(bool)
     language_changed = Signal(str)
+    ai_settings_changed = Signal()
 
     def __init__(self, settings):
         super().__init__()
@@ -154,18 +155,29 @@ class SettingsPage(QWidget):
         )
         self.model_combo = QComboBox()
         self.model_combo.setEditable(True)
-        self.model_combo.addItems(["qwen3:4b", "qwen3.5:4b", "gemma3:4b"])
+        self.model_combo.addItems(["qwen3.5:4b", "qwen3:4b", "gemma3:4b"])
         self.model_combo.setCurrentText(
             self.settings.get_ollama("model", "qwen3:4b")
         )
-        self.model_combo.currentTextChanged.connect(
-            lambda value: self.settings.set_ollama("model", value.strip())
-            if value.strip() else None
-        )
+        self.model_combo.currentTextChanged.connect(self.change_model)
         section.add_setting(
             "Model AI", "Nazwa modelu Ollama używanego przez asystenta.",
             self.model_combo
         )
+
+        self.lightweight_checkbox = QCheckBox()
+        self.lightweight_checkbox.setChecked(self.settings.get("lightweight", False))
+        self.lightweight_checkbox.toggled.connect(self.change_lightweight)
+        section.add_setting(
+            "Tryb Lightweight",
+            "Qwen3 1.7B do notatek, quizów i fiszek; Gemma3 1B opcjonalnie do quizów i fiszek. "
+            "Analiza obrazów nadal używa Gemma3 4B (1B nie obsługuje obrazów).",
+            self.lightweight_checkbox
+        )
+        self.light_models_info = QLabel("Wymagane modele: qwen3:1.7b, gemma3:1b; do zdjęć gemma3:4b")
+        self.light_models_info.setObjectName("SettingsRowDescription")
+        self.light_models_info.setWordWrap(True)
+        section.content.addWidget(self.light_models_info)
 
         self.auto_start = QCheckBox()
         self.auto_start.setChecked(self.settings.get_ollama("auto_start", True))
@@ -221,6 +233,15 @@ class SettingsPage(QWidget):
     def change_sidebar(self, compact):
         self.settings.set("sidebar_compact", compact)
         self.sidebar_compact_changed.emit(compact)
+
+    def change_model(self, value):
+        if value.strip():
+            self.settings.set_ollama("model", value.strip())
+            self.ai_settings_changed.emit()
+
+    def change_lightweight(self, enabled):
+        self.settings.set("lightweight", enabled)
+        self.ai_settings_changed.emit()
 
     def check_ollama(self):
         self.ollama_status.setText("Sprawdzanie...")

@@ -51,7 +51,7 @@ class AIStatusService(QObject):
     def __init__(
         self,
         base_url="http://localhost:11434",
-        model="qwen3:4b",
+        model="qwen3.5:4b",
         parent=None
     ):
         super().__init__(parent)

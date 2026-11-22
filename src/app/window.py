@@ -1,7 +1,7 @@
 import sys
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QStackedWidget,
-    QSizePolicy, QApplication
+    QSizePolicy, QApplication, QMessageBox, QMenu, QSystemTrayIcon
 )
 from PySide6.QtCore import Qt, QEvent
 from PySide6.QtGui import QCursor, QFont
@@ -13,6 +13,8 @@ from pages.notes import NotesPage
 from pages.quiz import QuizPage
 from pages.study import StudyPage
 from pages.settings import SettingsPage
+from pages.profile import ProfilePage
+from datetime import datetime
 from themes.theme import DARK_THEME, LIGHT_THEME
 from services.ai_status_service import AIStatusService
 
@@ -40,7 +42,9 @@ class MainWindow(QMainWindow):
 
         self.ai_status_service = AIStatusService(
             base_url="http://localhost:11434",
-            model=self.settings_mng.get_ollama("model") or "qwen3.5:4b",
+            model=(self.settings_mng.get_ollama("light_model", "qwen3:1.7b")
+                   if self.settings_mng.get("lightweight", False)
+                   else self.settings_mng.get_ollama("model", "qwen3.5:4b")),
             parent=self
         )
 
@@ -63,14 +67,15 @@ class MainWindow(QMainWindow):
         self.stack = QStackedWidget()
         self.start_page = StartPage()
         self.notes_page = NotesPage(self.settings_mng)
-        self.quiz_page = QuizPage()
-        self.study_page = StudyPage()
+        self.quiz_page = QuizPage(self.settings_mng)
+        self.study_page = StudyPage(self.settings_mng)
         self.settings_page = SettingsPage(self.settings_mng)
-        self.notes_page.quiz_requested.connect(self.quiz_page.start_quiz)
+        self.profile_page = ProfilePage()
+        self.settings_page.ai_settings_changed.connect(self.refresh_ai_settings)
 
         for page in (
             self.start_page, self.notes_page, self.quiz_page,
-            self.study_page, self.settings_page
+            self.study_page, self.profile_page, self.settings_page
         ):
             if hasattr(page, "page_requested"):
                 page.page_requested.connect(self.change_page)
@@ -89,8 +94,13 @@ class MainWindow(QMainWindow):
 
         self.page_names = {
             "start": "Start", "study": "Nauka", "notes": "Notatki",
-            "quiz": "Quizy", "settings": "Ustawienia"
+            "quiz": "Quizy", "profile": "Moja przygoda", "settings": "Ustawienia"
         }
+        self.notifications = []
+        self.title_bar.search_requested.connect(self.search_everywhere)
+        self.title_bar.notifications_requested.connect(self.show_notifications)
+        self.quiz_page.activity.connect(self.notify)
+        self.study_page.activity.connect(self.notify)
         self.change_page("start")
 
         for widget in [self, *self.findChildren(QWidget)]:
@@ -101,13 +111,51 @@ class MainWindow(QMainWindow):
         pages = {
             "start": self.start_page, "study": self.study_page,
             "notes": self.notes_page, "quiz": self.quiz_page,
+            "profile": self.profile_page,
             "settings": self.settings_page
         }
         if page not in pages:
             return
         self.sidebar.select(page)
+        if page in ("quiz", "study"):
+            if self.notes_page.dirty:
+                self.notes_page.save_current_note()
+            if page == "quiz":
+                self.quiz_page.refresh_notes()
+            else:
+                self.study_page.refresh_sources_list()
+        if page == "profile":
+            self.profile_page.refresh()
         self.stack.setCurrentWidget(pages[page])
         self.title_bar.set_page(self.page_names[page])
+
+    def notify(self, message):
+        stamp = datetime.now().strftime("%H:%M")
+        self.notifications.insert(0, f"{stamp}  {message}")
+        self.notifications = self.notifications[:50]
+        self.title_bar.notification_button.setToolTip(f"Powiadomienia ({len(self.notifications)}) — {message}")
+        self.statusBar().showMessage(message, 7000)
+
+    def show_notifications(self):
+        QMessageBox.information(self, "Powiadomienia", "\n\n".join(self.notifications[:12]) if self.notifications else "Brak powiadomień.")
+
+    def search_everywhere(self, query):
+        self.change_page("notes")
+        self.notes_page.search.setText(query)
+        self.notes_page.search.setFocus()
+        self.notify(f"Wyszukiwanie notatek: {query}")
+
+    def refresh_ai_settings(self):
+        light = self.settings_mng.get("lightweight", False)
+        self.ai_status_service.model = (
+            self.settings_mng.get_ollama("light_model", "qwen3:1.7b") if light
+            else self.settings_mng.get_ollama("model", "qwen3.5:4b")
+        )
+        self.ai_status_service.base_url = self.settings_mng.get_ollama(
+            "base_url", "http://localhost:11434"
+        )
+        self.title_bar.set_ai_status(False, "Sprawdzanie modelu...")
+        self.ai_status_service.check_status()
 
     def change_theme(self, theme_name):
         self.theme_name = theme_name

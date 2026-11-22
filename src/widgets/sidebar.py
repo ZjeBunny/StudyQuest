@@ -147,7 +147,8 @@ class Sidebar(QFrame):
             ("\uf015", "Strona główna", "start"),
             ("\uf19d", "Nauka", "study"),
             ("\uf249", "Notatki", "notes"),
-            ("\uf0cb", "Quizy", "quiz")
+            ("\uf0cb", "Quizy", "quiz"),
+            ("\uf091", "Moja przygoda", "profile")
         ]
 
         for icon, text, key in navigation:

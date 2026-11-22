@@ -10,8 +10,12 @@ DEFAULT_SETTINGS = {
     "font_size": 14,
     "animations": True,
     "sidebar_compact": False,
+    "lightweight": False,
     "ollama": {
         "model": "qwen3.5:4b",
+        "light_model": "qwen3:1.7b",
+        "light_vision_model": "gemma3:1b",
+        "vision_model": "gemma3:4b",
         "auto_start": True,
         "base_url": "http://localhost:11434"
     }

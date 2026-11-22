@@ -5,16 +5,22 @@ from urllib.error import URLError, HTTPError
 
 
 class NoteAI:
-    def __init__(self, base_url="http://localhost:11434", model="qwen3.5:4b"):
+    def __init__(self, base_url="http://localhost:11434", model="qwen3.5:4b", vision_model="gemma3:4b"):
         self.base_url = base_url.rstrip("/")
         self.model = model
+        self.vision_model = vision_model
 
-    def _chat(self, messages, images=None, model=None, timeout=180):
+    def _chat(self, messages, images=None, model=None, timeout=180, json_mode=False, num_predict=2200):
         payload = {
             "model": model or self.model,
             "messages": messages,
-            "stream": False
+            "stream": False,
+            "think": False,
+            "keep_alive": "5m",
+            "options": {"num_ctx": 3072, "num_predict": num_predict, "temperature": 0.25}
         }
+        if json_mode:
+            payload["format"] = "json"
         if images:
             payload["messages"][-1]["images"] = images
         request = Request(
@@ -23,9 +29,20 @@ class NoteAI:
             headers={"Content-Type": "application/json"},
             method="POST"
         )
-        with urlopen(request, timeout=timeout) as response:
-            result = json.loads(response.read().decode("utf-8"))
-        return result.get("message", {}).get("content", "")
+        try:
+            with urlopen(request, timeout=timeout) as response:
+                result = json.loads(response.read().decode("utf-8"))
+        except HTTPError as error:
+            detail = error.read().decode("utf-8", errors="replace")
+            if error.code == 404:
+                raise RuntimeError(f"Nie znaleziono modelu {model or self.model}. Pobierz go poleceniem ollama pull {model or self.model}.") from error
+            raise RuntimeError(f"Ollama HTTP {error.code}: {detail[:350]}") from error
+        except (URLError, OSError) as error:
+            raise RuntimeError(f"Nie można połączyć się z Ollama ({self.base_url}): {error}") from error
+        content = result.get("message", {}).get("content", "")
+        if not content:
+            raise ValueError("Model zwrócił pustą odpowiedź. Spróbuj ponownie.")
+        return content
 
     def analyze_note(self, title, text):
         prompt = (
@@ -38,30 +55,82 @@ class NoteAI:
         )
         return self._chat([{"role": "user", "content": prompt}])
 
-    def generate_quiz(self, title, text, count=8):
+    def _plan_material(self, title, text, kind):
+        words = len(text.split())
+        if words < 12:
+            raise ValueError("Za mało materiału do generowania. Dodaj co najmniej kilkanaście słów.")
+        upper = 18 if kind == "quiz" else 30
+        estimated = max(2, min(upper, round(words / (65 if kind == "quiz" else 35))))
         prompt = (
-            'Na podstawie materiału przygotuj quiz po polsku. Zwróć WYŁĄCZNIE '
-            'JSON w formacie: {"questions":[{"question":"tekst",'
-            '"answers":["A","B","C","D"],"correct":0,"explanation":"wyjaśnienie"}]}. '
-            'Indeks correct jest od 0 do 3. Każde pytanie ma mieć dokładnie '
-            '4 odpowiedzi i jedną poprawną. Nie twórz pytań spoza materiału. '
-            'Liczba pytań: ' + str(max(1, min(int(count), 20)))
-            + '. Tytuł: ' + title + '\nMATERIAŁ:\n' + text
+            "Oceń zakres materiału edukacyjnego. Zdecyduj, ile "
+            + ("pytań testowych" if kind == "quiz" else "fiszek")
+            + " potrzeba, by pokryć wszystkie WAŻNE niezależne fakty bez powtórzeń. "
+            + f"Zwróć tylko JSON: {{\"count\": liczba całkowita od 1 do {upper}}}. "
+            + f"Orientacyjna liczba to {estimated}, ale dostosuj ją do liczby pojęć. "
+            + "Nie twórz więcej pozycji niż faktycznie uzasadnia treść. "
+            + f"Tytuł: {title}\nMATERIAŁ:\n{text[:9500]}"
         )
-        raw = self._chat([{"role": "user", "content": prompt}])
-        return self._parse_json(raw, "questions")
+        try:
+            raw = self._chat([{"role": "user", "content": prompt}], json_mode=True, timeout=90)
+            parsed = json.loads(raw)
+            count = int(parsed.get("count", estimated))
+            return max(1, min(upper, count))
+        except (ValueError, TypeError, KeyError):
+            return estimated
 
-    def generate_flashcards(self, title, text, count=12):
+    def generate_quiz(self, title, text, count=None):
+        count = max(2, min(18, round(len(text.split()) / 65))) if count is None else max(1, min(int(count), 18))
         prompt = (
-            'Utwórz fiszki językowe/pojęciowe na podstawie materiału. Zwróć '
-            'WYŁĄCZNIE JSON: {"cards":[{"front":"hasło lub pytanie",'
-            '"back":"odpowiedź"}]}. Jedna konkretna informacja na fiszkę. '
-            'Nie dopowiadaj faktów spoza materiału. Liczba: '
-            + str(max(1, min(int(count), 30))) + '. Tytuł: ' + title
-            + '\nMATERIAŁ:\n' + text
+            'Na podstawie materiału przygotuj test po polsku. Zwróć WYŁĄCZNIE '
+            'JSON: {"questions":[{"question":"tekst",'
+            '"answers":["A","B","C","D"],"correct":0,"explanation":"krótko"}]}. '
+            'Dokładnie cztery sensowne różne odpowiedzi; indeks correct od 0 do 3. '
+            'Nie wymyślaj faktów spoza materiału. Bez powtórzeń. '
+            f'Wygeneruj {count} pytań, o ile materiał na to pozwala. '
+            f'Tytuł: {title}\nMATERIAŁ:\n{text[:12000]}'
         )
-        raw = self._chat([{"role": "user", "content": prompt}])
-        return self._parse_json(raw, "cards")
+        raw = self._chat([{"role": "user", "content": prompt}], json_mode=True, num_predict=min(5500, 300 + count * 170))
+        return self._validate_questions(self._parse_json(raw, "questions"))
+
+    def generate_flashcards(self, title, text, count=None):
+        count = max(2, min(30, round(len(text.split()) / 35))) if count is None else max(1, min(int(count), 30))
+        prompt = (
+            'Utwórz fiszki z materiału. Zwróć WYŁĄCZNIE JSON: '
+            '{"cards":[{"front":"pytanie lub hasło","back":"krótka odpowiedź"}]}. '
+            'Każda fiszka dotyczy jednego faktu. Nie wymyślaj informacji. '
+            f'Wygeneruj {count} fiszek, o ile materiał na to pozwala. '
+            f'Tytuł: {title}\nMATERIAŁ:\n{text[:12000]}'
+        )
+        raw = self._chat([{"role": "user", "content": prompt}], json_mode=True, num_predict=min(4500, 200 + count * 90))
+        return self._validate_cards(self._parse_json(raw, "cards"))
+
+    def study_answer(self, history, question):
+        messages = [{"role": "system", "content": (
+            "Jesteś polskim korepetytorem StudyQuest. Odpowiadaj rzeczowo, "
+            "zrozumiale i dydaktycznie. Uwzględnij historię rozmowy. "
+            "Gdy nie masz pewności, zaznacz to. Nie udawaj dostępu do internetu.") }]
+        messages.extend(history[-12:])
+        messages.append({"role": "user", "content": question})
+        return self._chat(messages, timeout=180)
+
+    def propose_study_note(self, history, material):
+        transcript = "\n".join(f"{m['role']}: {m['content']}" for m in history[-16:])
+        prompt = (
+            'Na podstawie rozmowy ucznia i dostarczonego materiału stwórz użyteczną '
+            'notatkę do nauki po polsku. Zwróć TYLKO JSON: '
+            '{"title":"krótki tytuł","category":"nazwa przedmiotu",'
+            '"html":"<h1>...</h1><p>...</p>"}. '
+            'Kategoria powinna być krótką nazwą przedmiotu (np. Matematyka). '
+            'Nie dopowiadaj niepotwierdzonych faktów, uporządkuj najważniejsze '
+            'pojęcia i przykłady. Bez skryptów i zewnętrznych linków. '
+            f'ROZMOWA:\n{transcript[:10000]}\nMATERIAŁ:\n{material[:9000]}'
+        )
+        raw = self._chat([{"role": "user", "content": prompt}], json_mode=True)
+        data = json.loads(raw)
+        for key in ("title", "category", "html"):
+            if not isinstance(data.get(key), str) or not data[key].strip():
+                raise ValueError("AI nie zwróciło kompletnej notatki.")
+        return {key: data[key].strip() for key in ("title", "category", "html")}
 
     @staticmethod
     def _parse_json(raw, key):
@@ -75,6 +144,39 @@ class NoteAI:
             raise ValueError("Model nie wygenerował elementów.")
         return items
 
+    @staticmethod
+    def _validate_questions(items):
+        valid = []
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            answers = item.get("answers")
+            correct = item.get("correct")
+            if isinstance(correct, str) and correct.strip().isdigit():
+                correct = int(correct)
+            if (isinstance(item.get("question"), str) and item["question"].strip()
+                    and isinstance(answers, list) and len(answers) == 4
+                    and all(isinstance(answer, str) and answer.strip() for answer in answers)
+                    and type(correct) is int and 0 <= correct < 4):
+                valid.append({"question": item["question"].strip(),
+                              "answers": [a.strip() for a in answers],
+                              "correct": correct,
+                              "explanation": str(item.get("explanation") or "")})
+        if not valid:
+            raise ValueError("Model nie zwrócił poprawnych pytań. Spróbuj ponownie lub wybierz większy model.")
+        return valid
+
+    @staticmethod
+    def _validate_cards(items):
+        valid = []
+        for item in items:
+            if isinstance(item, dict) and isinstance(item.get("front"), str) and isinstance(item.get("back"), str):
+                if item["front"].strip() and item["back"].strip():
+                    valid.append({"front": item["front"].strip(), "back": item["back"].strip()})
+        if not valid:
+            raise ValueError("Model nie zwrócił poprawnych fiszek.")
+        return valid
+
     def read_image(self, path):
         import base64
         with open(path, "rb") as file:
@@ -82,7 +184,7 @@ class NoteAI:
         return self._chat(
             [{"role": "user", "content": "Odczytaj zawartość obrazu. Zachowaj wzory, tabele i kolejność. Nie zgaduj nieczytelnych fragmentów."}],
             images=[encoded],
-            model="gemma3:4b",
+            model=self.vision_model,
             timeout=240
         )
 
