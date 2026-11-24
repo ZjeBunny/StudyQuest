@@ -1,4 +1,4 @@
-import socket
+import sys
 import subprocess
 import time
 from urllib.request import urlopen
@@ -12,7 +12,10 @@ class OllamaService:
 
     def is_running(self, timeout=1.5):
         try:
-            with urlopen(f"{self.base_url}/api/tags", timeout=timeout) as response:
+            with urlopen(
+                f"{self.base_url}/api/tags",
+                timeout=timeout
+            ) as response:
                 return response.status == 200
         except (URLError, TimeoutError, OSError):
             return False
@@ -20,16 +23,24 @@ class OllamaService:
     def start(self):
         if self.is_running():
             return True
+
         try:
             self.process = subprocess.Popen(
                 ["ollama", "serve"],
                 stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
+                stderr=subprocess.DEVNULL,
+                creationflags=(
+                    subprocess.CREATE_NO_WINDOW
+                    if sys.platform == "win32"
+                    else 0
+                )
             )
         except (FileNotFoundError, OSError):
             return False
+
         for _ in range(15):
             if self.is_running():
                 return True
             time.sleep(0.3)
+
         return False
