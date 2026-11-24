@@ -766,8 +766,8 @@ QPushButton#QuizAnswer[result="correct"] {{ color: {"#80efa8" if p['dark'] else 
 QPushButton#QuizAnswer[result="wrong"] {{ color: {"#ff9292" if p['dark'] else "#a51d2d"}; border: 2px solid {"#ff9292" if p['dark'] else "#a51d2d"}; }}
 """
 
-    from pathlib import Path
-    check_path = (Path(__file__).resolve().parents[2] / "assets/icons/check_light.svg").as_posix() if p["button_text"] == "#ffffff" else (Path(__file__).resolve().parents[2] / "assets/icons/check_dark.svg").as_posix()
+    from utils.paths import ASSETS_DIR
+    check_path = (ASSETS_DIR / "icons/check_light.svg").as_posix() if p["button_text"] == "#ffffff" else (ASSETS_DIR / "icons/check_dark.svg").as_posix()
     control = max(18, round(font_size * 1.15))
     css += f"""
 QLabel#NavText {{ font-weight: normal; }}

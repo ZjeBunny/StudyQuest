@@ -1,10 +1,10 @@
-from pathlib import Path
+from utils.paths import ASSETS_DIR
 from PySide6.QtCore import QByteArray, Qt, QSize
 from PySide6.QtGui import QPixmap, QPainter, QIcon
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QLabel, QAbstractButton, QWidget
 from themes.theme import CURRENT
-ROOT = Path(__file__).resolve().parents[2] / 'assets/icons'
+ROOT = ASSETS_DIR / 'icons'
 def pixmap(name, size=24):
     data=(ROOT / (name+'.svg')).read_text().replace('currentColor', CURRENT.get('accent','#52698c'))
     r=QSvgRenderer(QByteArray(data.encode())); p=QPixmap(size,size); p.fill(Qt.GlobalColor.transparent)

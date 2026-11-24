@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
     QLineEdit
 )
 from PySide6.QtGui import QPixmap
-from pathlib import Path
+from utils.paths import ASSETS_DIR
 
 class TitleBar(QFrame):
     search_requested = Signal(str)
@@ -115,7 +115,7 @@ class TitleBar(QFrame):
         self.theme_name = theme_name
         from themes.theme import THEMES
         dark = THEMES.get(theme_name, THEMES["Light"])[0]
-        logo_path = Path(__file__).resolve().parents[2] / "assets" / "images"
+        logo_path = ASSETS_DIR / "images"
         pixmap = QPixmap(str(logo_path / ("dark_logo.png" if dark else "light_logo.png")))
         if not pixmap.isNull():
             self.logo.setPixmap(pixmap.scaled(30, 30, Qt.AspectRatioMode.KeepAspectRatio,
