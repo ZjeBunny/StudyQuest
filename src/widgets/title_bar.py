@@ -1,3 +1,4 @@
+from widgets.icons import apply_icon
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
@@ -30,22 +31,7 @@ class TitleBar(QFrame):
 
         self.logo = QLabel()
         self.logo.setObjectName("TitleLogo")
-        logo_path = Path(__file__).resolve().parents[2] / "assets" / "images"
-
-        if theme_name == "Dark":
-            pixmap = QPixmap(str(logo_path / "dark_logo.png"))
-        else:
-            pixmap = QPixmap(str(logo_path / "light_logo.png"))
-
-        if not pixmap.isNull():
-            self.logo.setPixmap(
-                pixmap.scaled(
-                    30,
-                    30,
-                    Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation
-                )
-            )
+        self.set_theme(theme_name)
 
         self.logo.setFixedSize(34, 34)
         self.logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -82,14 +68,16 @@ class TitleBar(QFrame):
 
         layout.addWidget(self.search_input)
 
-        self.search_button = QPushButton("⌕")
+        self.search_button = QPushButton()
+        apply_icon(self.search_button, "search", 18)
         self.search_button.setObjectName("TitleButton")
         self.search_button.setToolTip("Wyszukaj")
         self.search_button.clicked.connect(self.toggle_search)
 
         layout.addWidget(self.search_button)
 
-        self.notification_button = QPushButton("♧")
+        self.notification_button = QPushButton()
+        apply_icon(self.notification_button, "bell", 18)
         self.notification_button.setObjectName("TitleButton")
         self.notification_button.setToolTip("Powiadomienia")
         self.notification_button.clicked.connect(
@@ -104,21 +92,34 @@ class TitleBar(QFrame):
 
         layout.addWidget(self.separator_line)
 
-        self.minimize_button = QPushButton("—")
+        self.minimize_button = QPushButton()
+        apply_icon(self.minimize_button, "minus", 18)
         self.minimize_button.setObjectName("WindowButton")
         self.minimize_button.clicked.connect(self.window.showMinimized)
 
-        self.maximize_button = QPushButton("□")
+        self.maximize_button = QPushButton()
+        apply_icon(self.maximize_button, "maximize", 18)
         self.maximize_button.setObjectName("WindowButton")
         self.maximize_button.clicked.connect(self.toggle_maximize)
 
-        self.close_button = QPushButton("×")
+        self.close_button = QPushButton()
+        apply_icon(self.close_button, "close", 18)
         self.close_button.setObjectName("CloseButton")
         self.close_button.clicked.connect(self.window.close)
 
         layout.addWidget(self.minimize_button)
         layout.addWidget(self.maximize_button)
         layout.addWidget(self.close_button)
+
+    def set_theme(self, theme_name):
+        self.theme_name = theme_name
+        from themes.theme import THEMES
+        dark = THEMES.get(theme_name, THEMES["Light"])[0]
+        logo_path = Path(__file__).resolve().parents[2] / "assets" / "images"
+        pixmap = QPixmap(str(logo_path / ("dark_logo.png" if dark else "light_logo.png")))
+        if not pixmap.isNull():
+            self.logo.setPixmap(pixmap.scaled(30, 30, Qt.AspectRatioMode.KeepAspectRatio,
+                                             Qt.TransformationMode.SmoothTransformation))
 
     def set_page(self, name):
         self.current_page.setText(name)
@@ -134,7 +135,6 @@ class TitleBar(QFrame):
 
         self.ai_status.setStyleSheet(
             f"color: {color}; "
-            "font-size: 11px; "
             "padding: 0 8px;"
         )
 
@@ -164,10 +164,10 @@ class TitleBar(QFrame):
     def toggle_maximize(self):
         if self.window.isMaximized():
             self.window.showNormal()
-            self.maximize_button.setText("□")
+            apply_icon(self.maximize_button, "maximize", 18)
         else:
             self.window.showMaximized()
-            self.maximize_button.setText("❐")
+            apply_icon(self.maximize_button, "restore", 18)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:

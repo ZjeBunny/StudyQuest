@@ -1,150 +1,81 @@
 # StudyQuest
 
-### AI-powered learning and note-taking application
+Polskojęzyczna aplikacja desktopowa wspierająca naukę z lokalną sztuczną inteligencją (Ollama).
 
-StudyQuest is an AI-powered learning application designed to make studying, organizing knowledge, and revising notes easier and more effective.
+## Funkcje
 
-Create and organize your notes, use AI to improve your understanding of complex topics, and automatically turn your learning materials into flashcards. StudyQuest brings your study tools together in one place, helping you spend less time organizing and more time learning.
+- Rozmowa z AI, tworzenie i analiza notatek, kategorie i wyszukiwanie.
+- Tworzenie notatek ze zdjęć i PDF, załączniki w rozmowie.
+- Quizy i fiszki na podstawie materiałów, punkty XP i odznaki.
+- Sześć motywów, własny kolor główny, wysoki kontrast i rozmiar tekstu 10–24 px.
+- Tryb Lightweight oraz wybór modeli tekstowych i obrazowych.
+- Wspólna blokada operacji AI i wskaźnik pracy.
 
----
+## Instalacja ze źródeł
 
-## ✨ Features
+Zalecany Python 3.11 lub 3.12, Windows lub Linux z graficznym środowiskiem. Rozpakuj archiwum i otwórz terminal w katalogu projektu.
 
-- **AI-Assisted Note-Taking** – Create, organize, and improve your notes with the help of AI.
-- **AI Note Revision** – Summarize, explain, rewrite, and revise your existing notes.
-- **Automatic Flashcard Generation** – Turn your notes into flashcards using AI, making knowledge revision easier.
-- **Active Learning** – Reinforce your knowledge through question-and-answer practice.
-- **Local AI Integration** – Use locally running AI models through Ollama.
-- **Privacy-Focused** – Keep your learning materials and AI processing local when using local models.
-- **User-Friendly Interface** – A clean desktop interface designed to provide a comfortable learning experience.
-
-## 🧠 AI Integration
-
-StudyQuest uses [Ollama](https://ollama.com/) to run AI models locally.
-
-This allows the application to provide AI-powered learning assistance without relying on external AI APIs.
-
-Supported capabilities include:
-- Understanding and processing notes.
-- Generating summaries and explanations.
-- Creating flashcards from learning materials.
-- Helping users revise and understand difficult topics.
-
-Model availability and performance depend on your hardware and installed Ollama models.
-
-## 🛠️ Technologies
-
-| Technology | Purpose |
-|---|---|
-| Python | Core application logic |
-| PySide6 | Desktop graphical interface |
-| Ollama | Local AI model integration |
-| SQLite | Local data storage |
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-Before running StudyQuest, make sure you have:
-
-- Python installed.
-- Ollama installed and running.
-- At least one compatible AI model downloaded.
-
-### Installation
-
-1. Clone the repository:
-
-   ```bash
-   git clone https://github.com/ZjeBunny/StudyQuest.git
-   cd StudyQuest
-   ```
-
-2. Create a virtual environment:
-
-   ```bash
-   python -m venv .venv
-   ```
-
-3. Activate it:
-
-   **Windows:**
-   ```powershell
-   .venv\Scripts\activate
-   ```
-
-4. Install dependencies:
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-5. Download an AI model using Ollama:
-
-   ```bash
-   ollama pull qwen3:4b
-   ```
-
-6. Run the application:
-
-   ```bash
-   python src/main.py
-   ```
-
-## 📁 Project Structure
-
-```text
-StudyQuest/
-├── assets/
-├── src/
-│   ├── pages/
-│   ├── widgets/
-│   ├── main.py
-│   └── theme.py
-├── requirements.txt
-├── README.md
-└── LICENSE
+```bash
+python -m venv .venv
 ```
 
-*The project structure may change as development continues.*
+Windows (PowerShell):
+```powershell
+.venv\Scripts\Activate.ps1
+```
+Linux:
+```bash
+source .venv/bin/activate
+```
+Następnie:
+```bash
+python -m pip install -r requirements.txt
+python src/main.py
+```
+Na Linuxie polecenie `python` może wymagać zastąpienia przez `python3` przed aktywacją środowiska.
 
-## 🗺️ Roadmap
+## Ollama
 
-- [x] Initial desktop application setup
-- [x] Light and dark themes
-- [x] Main application interface
-- [ ] AI-powered note assistance
-- [ ] AI note revision and summarization
-- [ ] Automatic flashcard generation
-- [ ] Flashcard revision system
-- [ ] Note organization and management
-- [ ] Improved AI model management
-- [ ] Application packaging and distribution
+Zainstaluj Ollama z https://ollama.com/download. Aplikacja sprawdza dostępność modeli i oferuje pobranie brakujących. Można też pobrać je ręcznie:
 
-## 🔒 Privacy
+```bash
+ollama pull qwen3.5:4b
+ollama pull gemma3:4b
+ollama pull qwen3:1.7b
+```
+Ostatni model jest przeznaczony dla opcjonalnego trybu Lightweight. Domyślny adres serwera: `http://localhost:11434`. Jeśli serwer nie działa, uruchom `ollama serve`.
 
-StudyQuest is designed with local AI processing in mind. When using locally hosted Ollama models, prompts and learning materials are processed on your own machine rather than sent to an external AI API.
+Modele zajmują kilka GB miejsca; wydajność zależy od RAM, procesora i GPU. Przy 8 GB RAM warto wypróbować Lightweight. Analiza obrazów nadal wymaga modelu obrazowego.
 
-Other network-dependent features, if introduced, may have separate data requirements.
+## Korzystanie
 
-## 🤝 Contributing
+- **Nauka:** zadaj pytanie, opcjonalnie wybierz notatkę lub załącz plik.
+- **Notatki:** twórz kategorie, edytuj materiały lub generuj notatki z plików.
+- **Quizy:** wybierz materiał oraz quiz albo fiszki.
+- **Moja przygoda:** sprawdzaj postępy.
+- **Ustawienia:** wybierz motyw, rozmiar tekstu i modele AI.
 
-Contributions, ideas, bug reports, and suggestions are welcome!
+PDF: maksymalnie 30 stron; streszczanie i rozmowa z PDF mają limit 12 000 znaków materiału. Skanowane strony bez tekstu są analizowane przez model obrazowy. Renderer obsługuje podstawowy Markdown i część zapisów matematycznych, nie pełny LaTeX. Odpowiedzi AI mogą zawierać błędy.
 
-If you would like to contribute:
+## Struktura
 
-1. Fork the repository.
-2. Create a new branch.
-3. Make your changes.
-4. Submit a pull request.
+```text
+assets/       grafiki, fonty i ikony SVG
+src/app/      główne okno
+src/pages/    zakładki
+src/ai/       komunikacja z AI
+src/services/ ustawienia, modele i zapis danych
+src/database/ baza notatek
+src/themes/   motywy
+src/utils/    renderer Markdown
+src/widgets/  komponenty Qt
+src/main.py   punkt wejścia
+```
 
-## 📄 License
+Notatki i ustawienia są zapisywane w katalogach użytkownika wskazanych przez Qt. Przy lokalnym serwerze Ollama przetwarzanie modeli odbywa się lokalnie; pobieranie modeli wymaga internetu. Nie usuwaj danych aplikacji bez kopii zapasowej.
 
-This project is licensed under the terms of the license specified in the `LICENSE` file.
+## Zależności i dystrybucja
 
----
+`requirements.txt` zawiera zależności uruchamianej aplikacji. `requirements-dev.txt` zawiera dodatkową zależność nieużywanego modułu eksperymentalnego `ai/agent.py`. Python i Ollama są instalowane osobno.
 
-<p align="center">
-  <b>StudyQuest</b><br>
-  Learn smarter. Stay organized. Remember more.
-</p>
+Archiwum zawiera kod źródłowy, nie gotowy plik EXE. Przed dystrybucją należy dołączyć właściwą licencję projektu oraz informacje licencyjne użytych bibliotek, modeli i zasobów. W tym archiwum nie ma pliku LICENSE.

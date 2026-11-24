@@ -1,0 +1,4 @@
+PySide6
+pypdf
+PyMuPDF>=1.24.3
+pydantic-ai

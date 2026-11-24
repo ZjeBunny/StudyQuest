@@ -1,9 +1,10 @@
+from widgets.icons import apply_icon, icon
 from html.parser import HTMLParser
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QRadioButton,
     QButtonGroup, QMessageBox, QComboBox, QProgressBar, QStackedWidget,
-    QFrame
+    QFrame, QScrollArea, QSizePolicy
 )
 from ai.tools import AIWorker, ai_gate
 from services.progress import ProgressStore
@@ -65,12 +66,14 @@ class QuizPage(QWidget):
         home_layout = QVBoxLayout(home)
         home_layout.addStretch()
         buttons = QHBoxLayout()
-        self.quiz_choice = QPushButton("📝\n\nQUIZY\n\nSprawdź swoją wiedzę")
-        self.flash_choice = QPushButton("📚\n\nFISZKI\n\nPowtarzaj pojęcia")
+        self.quiz_choice = QPushButton("QUIZY\n\nSprawdź swoją wiedzę")
+        apply_icon(self.quiz_choice, "quiz", 32)
+        self.flash_choice = QPushButton("FISZKI\n\nPowtarzaj pojęcia")
+        apply_icon(self.flash_choice, "cards", 32)
         for button, mode in ((self.quiz_choice, "quiz"), (self.flash_choice, "cards")):
             button.setMinimumHeight(220)
             button.setMinimumWidth(230)
-            button.setStyleSheet("font-size: 19px; font-weight: bold; border: 1px solid #829CC5; border-radius: 14px; padding: 24px;")
+            button.setObjectName("QuizChoice")
             button.clicked.connect(lambda checked=False, m=mode: self.choose_mode(m))
             buttons.addWidget(button)
         home_layout.addLayout(buttons)
@@ -103,6 +106,8 @@ class QuizPage(QWidget):
         content.addWidget(self.status)
         self.progress = QProgressBar()
         self.progress.setRange(0, 0)
+        self.progress.setFixedHeight(6)
+        self.progress.setTextVisible(False)
         self.progress.hide()
         content.addWidget(self.progress)
 
@@ -113,7 +118,11 @@ class QuizPage(QWidget):
         self.group = QButtonGroup(self)
         self.buttons = []
         for i in range(4):
-            button = QRadioButton()
+            button = QPushButton()
+            button.setCheckable(True)
+            button.setObjectName("QuizAnswer")
+            button.toggled.connect(lambda checked, b=button: apply_icon(b, "check" if checked else "circle", 20))
+            apply_icon(button, "circle", 20)
             button.setMinimumHeight(44)
             self.group.addButton(button, i)
             self.buttons.append(button)
@@ -121,6 +130,8 @@ class QuizPage(QWidget):
             button.hide()
         self.feedback = QLabel()
         self.feedback.setWordWrap(True)
+        self.feedback.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.MinimumExpanding)
+        self.feedback.setTextFormat(Qt.TextFormat.PlainText)
         content.addWidget(self.feedback)
         self.next_button = QPushButton("Sprawdź odpowiedź")
         self.next_button.clicked.connect(self.answer_or_next)
@@ -140,7 +151,11 @@ class QuizPage(QWidget):
         self.flash_next.hide()
         content.addWidget(self.flash_next)
         content.addStretch()
-        self.stack.addWidget(page)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setWidget(page)
+        self.stack.addWidget(scroll)
         self.refresh_notes()
 
     def choose_mode(self, mode):
@@ -234,7 +249,7 @@ class QuizPage(QWidget):
         except ValueError as error:
             QMessageBox.information(self, "Materiał", str(error))
             return
-        if not ai_gate.claim():
+        if not ai_gate.claim("generate_quiz" if self.mode == "quiz" else "generate_flashcards"):
             self.status.setText("AI jest zajęte innym zadaniem — poczekaj.")
             return
         self.clear_results()
@@ -308,7 +323,10 @@ class QuizPage(QWidget):
             button.setText(answer)
             button.setChecked(False)
             button.setEnabled(True)
-            button.setStyleSheet("QRadioButton { padding: 10px; }")
+            button.setProperty("result", "")
+            apply_icon(button, "circle", 20)
+            button.style().unpolish(button)
+            button.style().polish(button)
             button.show()
         self.group.setExclusive(True)
         self.feedback.clear()
@@ -328,9 +346,13 @@ class QuizPage(QWidget):
             for i, button in enumerate(self.buttons):
                 button.setEnabled(False)
                 if i == correct:
-                    button.setStyleSheet("QRadioButton { padding: 10px; color: #35b56a; }")
+                    button.setProperty("result", "correct")
+                    apply_icon(button, "check", 20)
                 elif i == selected:
-                    button.setStyleSheet("QRadioButton { padding: 10px; color: #e05a5a; }")
+                    button.setProperty("result", "wrong")
+                    apply_icon(button, "close", 20)
+                button.style().unpolish(button)
+                button.style().polish(button)
             ProgressStore().record(correct=int(selected == correct), incorrect=int(selected != correct))
             if selected == correct:
                 self.score += 1

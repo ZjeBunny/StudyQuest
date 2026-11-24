@@ -6,7 +6,7 @@ from PySide6.QtGui import QTextDocument
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTextBrowser,
     QTextEdit, QComboBox, QMessageBox, QDialog, QDialogButtonBox, QLineEdit,
-    QFormLayout, QFrame, QSizePolicy
+    QFormLayout, QFrame, QSizePolicy, QFileDialog
 )
 from ai.tools import AIWorker, ai_gate
 from services.progress import ProgressStore
@@ -95,6 +95,16 @@ class StudyPage(QWidget):
         self.question.setPlaceholderText("O co chcesz zapytać AI?")
         self.question.setFixedHeight(66)
         composer_layout.addWidget(self.question)
+        self.attachment = None
+        row = QHBoxLayout()
+        self.attach_button = QPushButton("Załącz zdjęcie / PDF")
+        self.attach_button.clicked.connect(self.choose_attachment)
+        self.attachment_label = QLabel("")
+        self.remove_attachment = QPushButton("Usuń załącznik")
+        self.remove_attachment.clicked.connect(self.clear_attachment)
+        self.remove_attachment.hide()
+        row.addWidget(self.attach_button); row.addWidget(self.attachment_label, 1); row.addWidget(self.remove_attachment)
+        composer_layout.addLayout(row)
         root.addWidget(self.composer)
 
         actions = QHBoxLayout()
@@ -168,23 +178,24 @@ class StudyPage(QWidget):
 
     def _ai_busy_changed(self, busy):
         self.ask_button.setEnabled(not busy)
+        self.attach_button.setEnabled(not busy)
         self.note_button.setEnabled(not busy and bool(self.history))
 
     def start_job(self, operation, *args, success):
         if self.busy:
             return
-        if not ai_gate.claim():
+        if not ai_gate.claim(operation):
             self.activity.emit("AI jest zajęte innym zadaniem — poczekaj.")
             return
         self.busy = True
         self.job_started = monotonic()
-        self.activity.emit("AI przygotowuje " + ("odpowiedź…" if operation == "study_answer" else "notatkę do nauki…"))
+        self.activity.emit("AI przygotowuje " + ("odpowiedź…" if operation in ("study_answer", "study_attachment") else "notatkę do nauki…"))
         self.ask_button.setEnabled(False)
         self.note_button.setEnabled(False)
         self.new_button.setEnabled(False)
         self.category.setEnabled(False)
         self.source.setEnabled(False)
-        self.activity.emit("● AI przygotowuje odpowiedź…" if operation == "study_answer" else "● AI tworzy notatkę…")
+        self.activity.emit("● AI przygotowuje odpowiedź…" if operation in ("study_answer", "study_attachment") else "● AI tworzy notatkę…")
         worker = AIWorker(operation, *args, parent=self, **self.ai_config())
         self.worker = worker
         worker.succeeded.connect(success)
@@ -222,47 +233,26 @@ class StudyPage(QWidget):
         QMessageBox.warning(self, "Nauka AI", error)
 
     @staticmethod
-    def _math_to_readable(text):
-        """Render common inline math legibly in Qt without showing raw delimiters."""
-        def convert(expr):
-            expr = expr.strip()
-            expr = re.sub(r"\\frac\{([^{}]+)\}\{([^{}]+)\}", r"(\1)/(\2)", expr)
-            expr = re.sub(r"\\sqrt\{([^{}]+)\}", r"√(\1)", expr)
-            expr = re.sub(r"\\(?:times|cdot)", " × ", expr)
-            expr = re.sub(r"\\(?:leq|le)", " ≤ ", expr)
-            expr = re.sub(r"\\(?:geq|ge)", " ≥ ", expr)
-            expr = expr.replace(r"\neq", " ≠ ").replace(r"\pi", "π").replace(r"\infty", "∞")
-            expr = expr.replace(r"\alpha", "α").replace(r"\beta", "β").replace(r"\theta", "θ")
-            expr = re.sub(r"\\([A-Za-z]+)", r"\1", expr)
-            return expr
-        text = re.sub(r"\$\$(.*?)\$\$", lambda m: "\n\n" + convert(m[1]) + "\n\n", text, flags=re.S)
-        text = re.sub(r"\\\[(.*?)\\\]", lambda m: "\n\n" + convert(m[1]) + "\n\n", text, flags=re.S)
-        text = re.sub(r"\\\((.*?)\\\)", lambda m: convert(m[1]), text, flags=re.S)
-        text = re.sub(r"(?<!\$)\$([^$\n]+)\$(?!\$)", lambda m: convert(m[1]), text)
-        return text
-
-    @staticmethod
     def _message_html(text):
-        # QTextDocument supports Markdown, including bold, lists, code and headings.
-        # Do not escape Markdown before passing it to setMarkdown.
-        cleaned = StudyPage._math_to_readable(str(text))
-        cleaned = re.sub(r"\\([*`_\[\].!])", r"\1", cleaned)
-        doc = QTextDocument()
-        doc.setMarkdown(cleaned)
-        return re.search(r"<body[^>]*>(.*)</body>", doc.toHtml(), re.S).group(1)
+        from utils.markdown_renderer import render_markdown
+        return render_markdown(text)
 
     def render_conversation(self):
+        from themes.theme import CURRENT
+        p = CURRENT or {"accent":"#52698c","surface":"#ffffff","text":"#172033","button_text":"#ffffff"}
+        size = int(p.get("font_size", 14))
         blocks = []
         for who, message in getattr(self, "display_history", []):
             is_user = who == "Ty"
             alignment = "right" if is_user else "left"
-            bg = "#2b3b52" if is_user else "#20252d"
+            bg = p["accent"] if is_user else p["surface"]
+            fg = p["button_text"] if is_user else p["text"]
             label = "Ty" if is_user else "AI · StudyQuest"
             blocks.append(
                 f'<table width="100%" cellspacing="0" cellpadding="5"><tr>'
                 f'<td align="{alignment}"><table width="76%" bgcolor="{bg}" cellpadding="12" cellspacing="0">'
-                f'<tr><td><span style="color:#a9c2ea;font-size:12px"><b>{label}</b></span>'
-                f'<div style="color:#edf1f7;font-size:14px">{self._message_html(message)}</div>'
+                f'<tr><td><span style="color:{fg};font-size:{round(size*12/14)}px"><b>{label}</b></span>'
+                f'<div style="color:{fg};font-size:{size}px">{self._message_html(message)}</div>'
                 f'</td></tr></table></td></tr></table><p style="margin:3px"></p>'
             )
         self.conversation.setHtml("".join(blocks) if blocks else
@@ -276,10 +266,26 @@ class StudyPage(QWidget):
         self.display_history.append((who, str(text)))
         self.render_conversation()
 
+    def choose_attachment(self):
+        from pathlib import Path
+        path, _ = QFileDialog.getOpenFileName(self, "Załącz materiał", "", "Materiały (*.pdf *.png *.jpg *.jpeg *.webp *.bmp)")
+        if path:
+            self.attachment = path
+            self.attachment_label.setText(Path(path).name)
+            self.remove_attachment.show()
+
+    def clear_attachment(self):
+        self.attachment = None
+        self.attachment_label.clear()
+        self.remove_attachment.hide()
+
     def ask(self):
         question = self.question.toPlainText().strip()
-        if not question:
+        if self.busy or ai_gate._lock.locked():
             return
+        if not question:
+            if not self.attachment: return
+            question = "Wyjaśnij załączony materiał."
         material = self.material_text()
         context = self.history.copy()
         if material and not self.history:
@@ -288,7 +294,12 @@ class StudyPage(QWidget):
         self.pending_material = material
         self.question.clear()
         self.append_message("Ty", question)
-        self.start_job("study_answer", context, question, success=self.answer_ready)
+        if self.attachment:
+            path = self.attachment
+            self.clear_attachment()
+            self.start_job("study_attachment", context, question, path, success=self.answer_ready)
+        else:
+            self.start_job("study_answer", context, question, success=self.answer_ready)
 
     def answer_ready(self, answer):
         self.history.extend([
@@ -325,6 +336,10 @@ class StudyPage(QWidget):
         parser = SafeNoteHTML()
         parser.feed(proposal["html"])
         preview.setHtml(parser.get_html())
+        # Legacy HTML proposals remain sanitized; Markdown proposals use the shared renderer.
+        if not re.search(r"<(?:h[1-3]|p|ul|ol|li|div|br)\b", proposal["html"], re.I):
+            from utils.markdown_renderer import set_markdown
+            set_markdown(preview, proposal["html"])
         layout.addWidget(preview)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(dialog.accept)

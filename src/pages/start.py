@@ -1,3 +1,4 @@
+from widgets.icons import apply_icon, icon
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
@@ -107,7 +108,8 @@ class StartPage(QWidget):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(12)
 
-        icon_label = QLabel(icon)
+        icon_label = QLabel()
+        apply_icon(icon_label, page, 32)
         icon_label.setObjectName("FeatureIcon")
 
         title_label = QLabel(title)

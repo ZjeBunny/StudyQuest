@@ -1,3 +1,4 @@
+from widgets.icons import apply_icon, icon
 from PySide6.QtCore import Signal, Qt
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTreeWidget, QTreeWidgetItem,
@@ -80,12 +81,14 @@ class NoteSidebar(QWidget):
             grouped.setdefault(note['category'], []).append(note)
         for category in sorted(grouped, key=str.casefold):
             items = grouped[category]
-            parent = QTreeWidgetItem([f"📁  {category}  ({len(items)})"])
+            parent = QTreeWidgetItem([f"{category}  ({len(items)})"])
+            parent.setIcon(0, icon("folder"))
             parent.setData(0, Qt.ItemDataRole.UserRole + 1, category)
             parent.setFlags(parent.flags() & ~Qt.ItemFlag.ItemIsSelectable)
             self.tree.addTopLevelItem(parent)
             for note in items:
-                child = QTreeWidgetItem(["📄  " + (note['title'] or 'Bez tytułu')])
+                child = QTreeWidgetItem([(note['title'] or 'Bez tytułu')])
+                child.setIcon(0, icon("notes"))
                 child.setData(0, Qt.ItemDataRole.UserRole, note['id'])
                 child.setToolTip(0, note.get('tags', ''))
                 parent.addChild(child)

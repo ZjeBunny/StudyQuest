@@ -1,3 +1,5 @@
+from utils.markdown_renderer import set_markdown
+from widgets.icons import apply_icon, icon
 from pathlib import Path
 from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtWidgets import (
@@ -68,6 +70,15 @@ class NotesPage(QWidget):
         browser_layout.setContentsMargins(0, 0, 0, 0)
         browser_layout.setSpacing(12)
         browser_layout.addLayout(filters)
+        imports = QHBoxLayout()
+        self.source_buttons = []
+        for label, kind, svg in (("Notatka ze zdjęcia", "image", "image"), ("Notatka z PDF", "pdf", "notes")):
+            button = QPushButton(label)
+            apply_icon(button, svg)
+            button.clicked.connect(lambda checked=False, k=kind: self.create_from_source(k))
+            imports.addWidget(button)
+            self.source_buttons.append(button)
+        browser_layout.addLayout(imports)
         self.note_sidebar = NoteSidebar()
         self.note_sidebar.note_selected.connect(self.show_note_actions)
         self.note_sidebar.new_note_requested.connect(self.new_note)
@@ -95,7 +106,8 @@ class NotesPage(QWidget):
             ("▤  Wygeneruj fiszki", lambda: self.request_quiz("flashcards"), False),
             ("🗑  Usuń notatkę", self.delete_note, False),
         ):
-            button = QPushButton(label)
+            button = QPushButton(label.split("  ", 1)[-1])
+            apply_icon(button, {"✎":"edit","✓":"quiz","▤":"cards","🗑":"trash"}[label[0]])
             button.setMinimumHeight(52)
             if primary:
                 button.setObjectName("PrimaryButton")
@@ -185,9 +197,12 @@ class NotesPage(QWidget):
 
     def _ai_busy_changed(self, busy):
         self.ai_button.setEnabled(not busy)
+        self.import_button.setEnabled(not busy)
+        for button in self.source_buttons:
+            button.setEnabled(not busy)
 
     def run_ai(self, operation, *args, success=None):
-        if not ai_gate.claim():
+        if not ai_gate.claim(operation):
             self.save_status.setText("AI jest zajęte innym zadaniem — poczekaj.")
             return
         worker = AIWorker(operation, *args, **self.ai_config(), parent=self)
@@ -233,7 +248,7 @@ class NotesPage(QWidget):
         layout = QVBoxLayout(dialog)
         browser = QTextBrowser()
         browser.setOpenExternalLinks(True)
-        browser.setMarkdown(str(result))
+        set_markdown(browser, result)
         layout.addWidget(browser)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
         buttons.rejected.connect(dialog.reject)
@@ -417,10 +432,23 @@ class NotesPage(QWidget):
 
     def analyze_now(self):
         text = self.note_text()
-        if not text:
+        from html.parser import HTMLParser
+        class Images(HTMLParser):
+            def __init__(self):
+                super().__init__(); self.paths = []
+            def handle_starttag(self, tag, attrs):
+                if tag == "img":
+                    path = dict(attrs).get("src", "")
+                    if path: self.paths.append(path)
+        parser = Images(); parser.feed(self.editor.toHtml())
+        paths = parser.paths
+        if not text and not paths:
             QMessageBox.information(self, "AI", "Najpierw wpisz treść notatki.")
             return
         if not self.ai_button.isEnabled():
+            return
+        if paths:
+            self.run_ai("analyze_with_images", self.title_input.text(), text, paths, success=lambda result: self.show_ai_result(result, "Analiza tekstu i obrazów"))
             return
         self.run_ai(
             "analyze_note", self.title_input.text(), text,
@@ -432,6 +460,36 @@ class NotesPage(QWidget):
             self.save_current_note()
         if self.editor.export_pdf(self):
             self.save_status.setText("Wyeksportowano PDF")
+
+    def create_from_source(self, kind):
+        path, _ = QFileDialog.getOpenFileName(self, "Wybierz materiał", "", "PDF (*.pdf)" if kind == "pdf" else "Obrazy (*.png *.jpg *.jpeg *.webp *.bmp)")
+        if not path:
+            return
+        style, ok = QInputDialog.getItem(self, "Rodzaj notatki", "Wybierz format:", ["Krótkie streszczenie", "Szczegółowa notatka", "Najważniejsze definicje", "Powtórka przed sprawdzianem"], 0, False)
+        if not ok:
+            return
+        self.run_ai("summarize_source", path, style, success=lambda text: self.preview_source_note(path, text))
+
+    def preview_source_note(self, path, text):
+        from PySide6.QtWidgets import QTextEdit, QFormLayout
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Sprawdź notatkę AI")
+        dialog.resize(680, 560)
+        layout = QVBoxLayout(dialog)
+        form = QFormLayout()
+        title = QLineEdit(Path(path).stem)
+        category = QComboBox(); category.setEditable(True)
+        category.addItems(self.repository.categories())
+        form.addRow("Tytuł", title); form.addRow("Kategoria", category)
+        layout.addLayout(form)
+        preview = QTextEdit(); set_markdown(preview, text); layout.addWidget(preview, 1)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(dialog.accept); buttons.rejected.connect(dialog.reject); layout.addWidget(buttons)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.new_note(category.currentText())
+            self.title_input.setText(title.text())
+            self.editor.setHtml(preview.toHtml())
+            self.save_current_note()
 
     def import_source(self):
         path, _ = QFileDialog.getOpenFileName(

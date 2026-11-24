@@ -1,6 +1,6 @@
 
 DARK_THEME = '''
-* { font-family: "Segoe UI"; color: #e7e7e7; }
+* { font-size: 14px; font-family: "Segoe UI"; color: #e7e7e7; }
 QMainWindow, QWidget { background: #111315; }
 QLabel { background: transparent; }
 
@@ -380,7 +380,7 @@ QLabel#StudyStatus { color: #94a3b8; font-size: 12px; }
 
 
 LIGHT_THEME = '''
-* { font-family: "Segoe UI"; color: #202124; }
+* { font-size: 14px; font-family: "Segoe UI"; color: #202124; }
 QMainWindow, QWidget { background: #f5f6f8; }
 QLabel { background: transparent; }
 
@@ -704,3 +704,78 @@ QWidget#NotesPage QListWidget::item {
     padding: 9px;
 }
 '''
+
+
+THEMES = {"Light": (False,"#f7f9fc","#dce5f2","#c5d5eb","#ffffff","#345eaa"),
+ "Dark": (True,"#121720","#202c3d","#30415a","#263244","#759be0"),
+ "Green": (True,"#101c17","#20382c","#31513e","#253e30","#65c995"),
+ "Purple": (True,"#191424","#30233f","#48345c","#392b4c","#c49af4"),
+ "Kids": (False,"#fff8e9","#d9f2ed","#ffe0ac","#ffffff","#a33d88"),
+ "Contrast": (True,"#000000","#202020","#353535","#101010","#ffdf45")}
+CURRENT = {}
+def palette(name, accent=""):
+    from PySide6.QtGui import QColor
+    dark, main, side, title, surface, default = THEMES.get(name, THEMES["Light"])
+    a = QColor(accent) if accent else QColor(default)
+    if not a.isValid(): a = QColor(default)
+    def lum(c):
+        channels = [c.redF(), c.greenF(), c.blueF()]
+        return sum(w * (v/12.92 if v <= .04045 else ((v+.055)/1.055)**2.4) for w,v in zip((.2126,.7152,.0722), channels))
+    def contrast(x,y):
+        hi,lo = sorted((lum(x),lum(y)), reverse=True)
+        return (hi+.05)/(lo+.05)
+    if name == "Contrast":
+        for _ in range(32):
+            if all(contrast(a,QColor(bg)) >= 4.5 for bg in (main,side,title,surface)): break
+            a = QColor.fromRgbF(*[v+(1-v)*.12 for v in (a.redF(),a.greenF(),a.blueF())])
+    luminance = lum(a)
+    a = a.name()
+    return dict(dark=dark, main=main, side=side, title=title, surface=surface, accent=a, text="#ffffff" if dark else "#172033", button_text="#101010" if luminance > .179 else "#ffffff")
+def scale_typography(css, font_size=14):
+    import re
+    ratio = max(10, min(24, int(font_size))) / 14
+    return re.sub(r'(font-size:\s*)(\d+)px',
+                  lambda m: f'{m[1]}{max(8, round(int(m[2])*ratio))}px', css)
+
+def stylesheet(name, accent="", font_size=14):
+    import re
+    p = palette(name, accent); CURRENT.clear(); CURRENT.update(p); CURRENT["font_size"] = font_size
+    base = DARK_THEME if p['dark'] else LIGHT_THEME
+    base = re.sub(r'#(?:52698c|627fa9|405a80|829cc5|a9c2ea|8794a8|778397)',p['accent'],base,flags=re.I)
+    css = base + f"""
+QMainWindow, QWidget {{ background: {p['main']}; }}
+QLabel {{ background: transparent; }}
+QFrame#TitleBar {{ background: {p['title']}; }}
+QFrame#Sidebar {{ background: {p['side']}; }}
+QFrame#WelcomeCard, QFrame#FeatureCard, QFrame#SettingsSection, QFrame#StatCard, QTextBrowser, QTextEdit, QLineEdit, QComboBox, QTreeWidget {{ background: {p['surface']}; }}
+QPushButton#PrimaryButton {{ background: {p['accent']}; color: {p['button_text']}; }}
+QPushButton#PrimaryButton:hover {{ background: {p['accent']}; border: 2px solid {p['text']}; }}
+QPushButton#NavButton[selected="true"] {{ background: {p['surface']}; border-left: 3px solid {p['accent']}; }}
+QPushButton:disabled {{ color: #888888; background: {p['main']}; }}
+QPushButton {{ background: {p['surface']}; border: 1px solid {p['accent']}; border-radius: 8px; padding: 8px; }}
+QPushButton:hover {{ border: 2px solid {p['accent']}; background: {p['side']}; }}
+QPushButton#QuizChoice {{ background: {p['surface']}; border: 2px solid {p['accent']}; border-radius: 14px; font-size: 19px; font-weight: bold; padding: 24px; }}
+QPushButton#QuizChoice:hover {{ background: {p['side']}; }}
+QPushButton#NavButton[compact="true"] {{ padding: 0; border: none; }}
+QPushButton#NavButton[compact="true"][selected="true"] {{ border: 1px solid {p['accent']}; }}
+QProgressBar {{ background: {p['side']}; border: none; min-height: 6px; max-height: 8px; border-radius: 3px; padding: 0; }}
+QProgressBar::chunk {{ background: {p['accent']}; border-radius: 3px; }}
+QPushButton#QuizAnswer {{ text-align: left; padding: 10px; }}
+QPushButton#QuizAnswer:checked {{ border: 2px solid {p['accent']}; background: {p['side']}; }}
+QPushButton#QuizAnswer[result="correct"] {{ color: {"#80efa8" if p['dark'] else "#176b36"}; border: 2px solid {"#80efa8" if p['dark'] else "#176b36"}; }}
+QPushButton#QuizAnswer[result="wrong"] {{ color: {"#ff9292" if p['dark'] else "#a51d2d"}; border: 2px solid {"#ff9292" if p['dark'] else "#a51d2d"}; }}
+"""
+
+    from pathlib import Path
+    check_path = (Path(__file__).resolve().parents[2] / "assets/icons/check_light.svg").as_posix() if p["button_text"] == "#ffffff" else (Path(__file__).resolve().parents[2] / "assets/icons/check_dark.svg").as_posix()
+    control = max(18, round(font_size * 1.15))
+    css += f"""
+QLabel#NavText {{ font-weight: normal; }}
+QLabel#NavText[selected="true"] {{ font-weight: bold; }}
+QPushButton#NavButton {{ min-height: {max(42, font_size+20)}px; max-height: {max(44,font_size+24)}px; padding: 4px; }}
+QPushButton#NavButton[compact="true"] {{ padding: 0; }}
+QSpinBox, QComboBox {{ min-height: {max(30,font_size+12)}px; }}
+QCheckBox::indicator {{ width: {control}px; height: {control}px; border: 2px solid {p['accent']}; border-radius: 4px; background: {p['surface']}; }}
+QCheckBox::indicator:checked {{ background: {p['accent']}; image: url({check_path}); }}
+"""
+    return scale_typography(css, font_size)

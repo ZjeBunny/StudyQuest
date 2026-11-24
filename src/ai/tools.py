@@ -5,14 +5,16 @@ from ai.note import NoteAI
 
 class AIGate(QObject):
     busy_changed = Signal(bool)
+    operation_changed = Signal(str)
 
     def __init__(self):
         super().__init__()
         self._lock = Lock()
 
-    def claim(self):
+    def claim(self, operation="Konfiguracja modeli AI"):
         if not self._lock.acquire(blocking=False):
             return False
+        self.operation_changed.emit(operation)
         self.busy_changed.emit(True)
         return True
 

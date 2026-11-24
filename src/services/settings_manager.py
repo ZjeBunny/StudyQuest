@@ -5,7 +5,8 @@ from PySide6.QtCore import QStandardPaths
 
 
 DEFAULT_SETTINGS = {
-    "theme": "System",
+    "theme": "Light",
+    "accent": "",
     "language": "pl",
     "font_size": 14,
     "animations": True,
@@ -58,7 +59,7 @@ class SettingsManager:
             # Keep defaults if the settings file is damaged or inaccessible.
             pass
 
-        if data["theme"] not in ("Dark", "Light", "System"):
+        if data["theme"] not in ("Dark", "Light", "System", "Green", "Purple", "Kids", "Contrast"):
             data["theme"] = "System"
         if data["language"] not in ("pl", "en"):
             data["language"] = "pl"

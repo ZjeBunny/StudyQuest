@@ -1,7 +1,7 @@
 from PySide6.QtCore import Qt, Signal, QProcess
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFrame, QLabel, QComboBox,
-    QCheckBox, QSpinBox, QScrollArea, QPushButton, QMessageBox
+    QCheckBox, QSpinBox, QScrollArea, QPushButton, QMessageBox, QColorDialog
 )
 
 
@@ -93,7 +93,7 @@ class SettingsPage(QWidget):
         section = SettingsSection("Wygląd", "Dostosuj wygląd aplikacji.")
         self.theme_combo = QComboBox()
         for label, value in (
-            ("Systemowy", "System"), ("Ciemny", "Dark"), ("Jasny", "Light")
+            ("Jasny", "Light"), ("Ciemny", "Dark"), ("Czarno-zielony", "Green"), ("Czarno-fioletowy", "Purple"), ("Kolorowy", "Kids"), ("Wysoki kontrast", "Contrast")
         ):
             self.theme_combo.addItem(label, value)
         index = self.theme_combo.findData(self.settings.get("theme", "System"))
@@ -104,22 +104,26 @@ class SettingsPage(QWidget):
             "Wybierz jasny, ciemny lub dopasowany do systemu.",
             self.theme_combo
         )
+        accent = QPushButton("Wybierz kolor")
+        accent.clicked.connect(self.choose_accent)
+        section.add_setting("Kolor główny", "Przyciski, ikony i czat", accent)
+        reset = QPushButton("Kolor motywu")
+        reset.clicked.connect(self.reset_accent)
+        section.content.addWidget(reset)
         self.content_layout.addWidget(section)
+
+    def choose_accent(self):
+        color = QColorDialog.getColor(parent=self)
+        if color.isValid():
+            self.settings.set("accent", color.name())
+            self.theme_changed.emit(self.theme_combo.currentData())
+
+    def reset_accent(self):
+        self.settings.set("accent", "")
+        self.theme_changed.emit(self.theme_combo.currentData())
 
     def create_interface_section(self):
         section = SettingsSection("Interfejs", "Skonfiguruj sposób wyświetlania treści.")
-        self.language_combo = QComboBox()
-        self.language_combo.addItem("Polski", "pl")
-        self.language_combo.addItem("English", "en")
-        self.language_combo.setCurrentIndex(
-            max(0, self.language_combo.findData(self.settings.get("language", "pl")))
-        )
-        self.language_combo.currentIndexChanged.connect(self.change_language)
-        section.add_setting(
-            "Język", "Zmiana języka zostanie w pełni zastosowana po ponownym uruchomieniu.",
-            self.language_combo
-        )
-
         self.font_size = QSpinBox()
         self.font_size.setRange(10, 24)
         self.font_size.setSuffix(" px")
@@ -130,11 +134,15 @@ class SettingsPage(QWidget):
             self.font_size
         )
 
+        reset_font = QPushButton("Przywróć rozmiar 14 px")
+        reset_font.clicked.connect(lambda: self.font_size.setValue(14))
+        section.content.addWidget(reset_font)
+
         self.animations = QCheckBox()
         self.animations.setChecked(self.settings.get("animations", True))
         self.animations.toggled.connect(self.change_animations)
         section.add_setting(
-            "Animacje", "Włącz lub wyłącz animacje interfejsu.",
+            "Animacje", "Animacja rozwijania i zwijania paska bocznego.",
             self.animations
         )
 
@@ -159,22 +167,33 @@ class SettingsPage(QWidget):
         self.model_combo.setCurrentText(
             self.settings.get_ollama("model", "qwen3:4b")
         )
-        self.model_combo.currentTextChanged.connect(self.change_model)
+        self.model_combo.activated.connect(lambda _: self.change_model(self.model_combo.currentText()))
+        self.model_combo.lineEdit().editingFinished.connect(lambda: self.change_model(self.model_combo.currentText()))
         section.add_setting(
             "Model AI", "Nazwa modelu Ollama używanego przez asystenta.",
             self.model_combo
         )
 
+        self.vision_combo = QComboBox()
+        self.vision_combo.setEditable(True)
+        self.vision_combo.addItem("gemma3:4b")
+        self.vision_combo.setCurrentText(self.settings.get_ollama("vision_model", "gemma3:4b"))
+        self.vision_combo.activated.connect(lambda _: self.change_vision())
+        self.vision_combo.lineEdit().editingFinished.connect(self.change_vision)
+        section.add_setting("Model obrazów", "Wybierz model obsługujący obrazy.", self.vision_combo)
+        reload_models = QPushButton("Odśwież modele Ollama")
+        reload_models.clicked.connect(self.refresh_models)
+        section.content.addWidget(reload_models)
         self.lightweight_checkbox = QCheckBox()
         self.lightweight_checkbox.setChecked(self.settings.get("lightweight", False))
         self.lightweight_checkbox.toggled.connect(self.change_lightweight)
         section.add_setting(
             "Tryb Lightweight",
-            "Qwen3 1.7B do notatek, quizów i fiszek; Gemma3 1B opcjonalnie do quizów i fiszek. "
+            "Qwen3 1.7B do nauki, notatek, quizów i fiszek. "
             "Analiza obrazów nadal używa Gemma3 4B (1B nie obsługuje obrazów).",
             self.lightweight_checkbox
         )
-        self.light_models_info = QLabel("Wymagane modele: qwen3:1.7b, gemma3:1b; do zdjęć gemma3:4b")
+        self.light_models_info = QLabel("Wymagane modele: qwen3:1.7b; do zdjęć gemma3:4b")
         self.light_models_info.setObjectName("SettingsRowDescription")
         self.light_models_info.setWordWrap(True)
         section.content.addWidget(self.light_models_info)
@@ -199,6 +218,7 @@ class SettingsPage(QWidget):
         row.addWidget(self.ollama_status, 1)
         section.content.addLayout(row)
         self.content_layout.addWidget(section)
+        self.update_active_models()
 
     def create_about_section(self):
         section = SettingsSection("Informacje", "Informacje o aplikacji.")
@@ -234,14 +254,59 @@ class SettingsPage(QWidget):
         self.settings.set("sidebar_compact", compact)
         self.sidebar_compact_changed.emit(compact)
 
+    def update_active_models(self):
+        light = self.settings.get("lightweight", False)
+        model = self.settings.get_ollama("light_model", "qwen3:1.7b") if light else self.settings.get_ollama("model", "qwen3.5:4b")
+        vision = self.settings.get_ollama("vision_model", "gemma3:4b")
+        self.light_models_info.setText(f"Tryb: {'Lightweight' if light else 'Normalny'} | Tekst: {model} | Obrazy: {vision}")
+        self.model_combo.setEnabled(not light)
+
+    def refresh_models(self):
+        import json
+        from urllib.request import urlopen
+        try:
+            with urlopen(self.settings.get_ollama("base_url", "http://localhost:11434").rstrip("/") + "/api/tags", timeout=2) as response:
+                names = [m["name"] for m in json.load(response)["models"]]
+        except (OSError, ValueError, KeyError) as error:
+            self.ollama_status.setText(str(error)); return
+        for combo in (self.model_combo, self.vision_combo):
+            current = combo.currentText()
+            combo.blockSignals(True)
+            combo.clear(); combo.addItems(sorted(set(names + [current])))
+            combo.setCurrentText(current); combo.blockSignals(False)
+        self.ollama_status.setText("Lista modeli odświeżona")
+
+    def change_vision(self):
+        self.apply_model(self.vision_combo, "vision_model", "gemma3:4b")
+
     def change_model(self, value):
-        if value.strip():
-            self.settings.set_ollama("model", value.strip())
-            self.ai_settings_changed.emit()
+        self.apply_model(self.model_combo, "model", "qwen3.5:4b")
+
+    def apply_model(self, combo, key, default):
+        value = combo.currentText().strip()
+        previous = self.settings.get_ollama(key, default)
+        if not value or value == previous:
+            return
+        def complete(ok):
+            if ok: self.settings.set_ollama(key, value)
+            combo.setCurrentText(value if ok else previous)
+            self.update_active_models(); self.ai_settings_changed.emit()
+        self.window().model_setup.ensure([value], complete)
 
     def change_lightweight(self, enabled):
-        self.settings.set("lightweight", enabled)
-        self.ai_settings_changed.emit()
+        if not enabled:
+            self.settings.set("lightweight", False)
+            self.update_active_models(); self.ai_settings_changed.emit()
+            return
+        self.lightweight_checkbox.setEnabled(False)
+        def complete(ok):
+            self.lightweight_checkbox.blockSignals(True)
+            self.lightweight_checkbox.setChecked(ok)
+            self.lightweight_checkbox.blockSignals(False)
+            self.lightweight_checkbox.setEnabled(True)
+            self.settings.set("lightweight", ok)
+            self.update_active_models(); self.ai_settings_changed.emit()
+        self.window().model_setup.ensure([self.settings.get_ollama("light_model", "qwen3:1.7b")], complete)
 
     def check_ollama(self):
         self.ollama_status.setText("Sprawdzanie...")

@@ -5,7 +5,7 @@ from PySide6.QtGui import QFont
 from app.window import MainWindow
 from services.settings_manager import SettingsManager
 from services.ollama_service import OllamaService
-from themes.theme import DARK_THEME, LIGHT_THEME
+from themes.theme import stylesheet, THEMES
 
 
 def system_theme_is_dark():
@@ -26,7 +26,7 @@ def system_theme_is_dark():
 def resolved_theme(theme_name):
     if theme_name == "System":
         return "Dark" if system_theme_is_dark() else "Light"
-    return theme_name if theme_name in ("Dark", "Light") else "Light"
+    return theme_name if theme_name in THEMES else "Light"
 
 
 def main():
@@ -35,9 +35,13 @@ def main():
     app.setOrganizationName("StudyQuest")
 
     settings = SettingsManager()
+    if sys.platform.startswith("linux") and settings.get("theme") == "System":
+        settings.set("theme", "Light")
     active_theme = resolved_theme(settings.get("theme", "System"))
-    app.setStyleSheet(DARK_THEME if active_theme == "Dark" else LIGHT_THEME)
-    app.setFont(QFont("Segoe UI", settings.get("font_size", 14)))
+    app.setStyleSheet(stylesheet(active_theme, settings.get("accent", ""), settings.get("font_size", 14)))
+    font = QFont("Segoe UI")
+    font.setPixelSize(settings.get("font_size", 14))
+    app.setFont(font)
 
     if settings.get_ollama("auto_start", True):
         OllamaService(settings.get_ollama(

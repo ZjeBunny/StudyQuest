@@ -1,3 +1,4 @@
+from widgets.icons import apply_icon
 
 from pathlib import Path
 
@@ -29,21 +30,9 @@ class NavigationButton(QPushButton):
         layout.setContentsMargins(14, 0, 12, 0)
         layout.setSpacing(14)
 
-        self.icon_label = QLabel(icon)
+        self.icon_label = QLabel()
         self.icon_label.setObjectName("NavIcon")
-        self.icon_label.setFont(QFont(icon_font, 12))
-        if key == "profile":
-            icon_path = Path(__file__).resolve().parents[2] / "assets/icons/trophy.svg"
-            renderer = QSvgRenderer(str(icon_path))
-            if renderer.isValid():
-                pixmap = QPixmap(24, 24)
-                pixmap.fill(Qt.GlobalColor.transparent)
-                painter = QPainter(pixmap)
-                renderer.render(painter)
-                painter.end()
-                self.icon_label.setText("")
-                self.icon_label.setPixmap(pixmap)
-            # If the SVG is missing, keep the Nerd Font star as a fallback.
+        apply_icon(self.icon_label, key)
         self.icon_label.setAlignment(
             Qt.AlignmentFlag.AlignCenter
         )
@@ -68,9 +57,9 @@ class NavigationButton(QPushButton):
 
         self.setProperty("selected", selected)
 
-        font = self.text_label.font()
-        font.setBold(selected)
-        self.text_label.setFont(font)
+        self.text_label.setProperty("selected", selected)
+        self.text_label.style().unpolish(self.text_label)
+        self.text_label.style().polish(self.text_label)
 
         self.style().unpolish(self)
         self.style().polish(self)
@@ -82,6 +71,11 @@ class NavigationButton(QPushButton):
         layout = self.layout()
 
         self.text_label.setVisible(not self.is_compact)
+        self.setProperty("compact", self.is_compact)
+        layout.setStretch(0, 1 if self.is_compact else 0)
+        layout.setStretch(2, 0 if self.is_compact else 1)
+        self.style().unpolish(self)
+        self.style().polish(self)
 
         if self.is_compact:
             layout.setContentsMargins(0, 0, 0, 0)
@@ -101,6 +95,7 @@ class NavigationButton(QPushButton):
 
 class Sidebar(QFrame):
     page_changed = Signal(str)
+    compact_changed = Signal(bool)
 
     def __init__(self, compact=False, animations=True):
         super().__init__()
@@ -120,31 +115,14 @@ class Sidebar(QFrame):
             b"maximumWidth"
         )
         self.animation.setDuration(220)
+        self.animation.finished.connect(lambda: self.setMinimumWidth(self.compact_width if self.is_compact else self.expanded_width))
         self.animation.setEasingCurve(
             QEasingCurve.Type.InOutCubic
         )
 
         self.buttons = {}
 
-        font_path = (
-            Path(__file__).resolve().parents[2]
-            / "assets"
-            / "fonts"
-            / "JetBrainsMonoNerdFont-Regular.ttf"
-        )
-
-        font_id = QFontDatabase.addApplicationFont(
-            str(font_path)
-        )
-
-        if font_id != -1:
-            families = QFontDatabase.applicationFontFamilies(
-                font_id
-            )
-            self.icon_font = families[0]
-        else:
-            self.icon_font = "Segoe UI Symbol"
-            print("Warning: Nerd Font could not be loaded.")
+        self.icon_font = "Segoe UI"
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 20, 12, 16)
@@ -204,6 +182,8 @@ class Sidebar(QFrame):
             "settings"
         )
 
+        self.toggle_button.setText("")
+        apply_icon(self.toggle_button, "left")
         self.select("start")
 
         if compact:
@@ -258,6 +238,7 @@ class Sidebar(QFrame):
             self.animation.stop()
 
     def set_compact(self, compact, animate=True):
+        changed = self.is_compact != bool(compact)
         self.is_compact = bool(compact)
 
         target_width = (
@@ -268,7 +249,7 @@ class Sidebar(QFrame):
 
         self.animation.stop()
 
-        self.setMinimumWidth(target_width)
+        self.setMinimumWidth(0)
 
         if animate and self.animations_enabled:
             self.animation.setStartValue(
@@ -279,9 +260,8 @@ class Sidebar(QFrame):
             )
             self.animation.start()
         else:
-            self.setMaximumWidth(
-                target_width
-            )
+            self.setMaximumWidth(target_width)
+            self.setMinimumWidth(target_width)
 
         self.section.setVisible(
             not self.is_compact
@@ -292,6 +272,8 @@ class Sidebar(QFrame):
                 self.is_compact
             )
 
-        self.toggle_button.setText(
-            "->" if self.is_compact else "<-"
-        )
+        self.toggle_button.setText("")
+        apply_icon(self.toggle_button, "right" if self.is_compact else "left")
+
+        if changed:
+            self.compact_changed.emit(self.is_compact)
